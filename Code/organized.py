@@ -36,8 +36,26 @@ CAPACITY = 20  # MWh
 MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
+NUM_SCENARIOS = 100
 RISK_AVERSE_FACTOR = 0.5
 BETA = 0.95
+
+PLOT_CVARS = False
+PLOT_SCENARIO_SCHEDULES = False
+PLOT_FINAL_SCHEDULE = False
+SHOW_SCENARIOS = False
+
+
+def main():
+    ems = EMS(Data())
+    max_days = ems.data.testing_data['DA'].shape[0] // 48
+    results = ems.run(15)
+    # pretty_printed = json.dumps(results, indent=4)
+    # print(pretty_printed)
+    profits = [day['overall_profit'] for day in results.values()]
+    print("\nTotal profit:", sum(profits))
+    print("Mean:", np.mean(profits))
+    print("Standard deviation:", np.std(profits))
 
 
 class Data:
@@ -82,7 +100,7 @@ class Data:
             'unique_id': 1,
         })
 
-    def get_forecast(self, auction_name):
+    def get_forecast_from_file(self, auction_name):
         exo_vars = self.training_data[auction_name].drop(
             columns=['y', 'ds', 'unique_id']).columns.tolist()
 
@@ -117,8 +135,8 @@ class Data:
         for auction_name in self.cross_vals.keys():
             print(f"Updating cross-validation for {auction_name}")
             cross_val = self.cross_vals[auction_name]
-            auction_prices = self.get_real_prices(auction_name)
-            forecasted = self.get_forecast(auction_name)
+            auction_prices = self.get_actual_prices(auction_name)
+            forecasted = self.get_forecast_from_file(auction_name)
             trading_hours = cross_val['ds'].dt.hour.unique()
             timeframe_mask = self.prediction_day['ds'].dt.floor(
                 'h').dt.hour.isin(trading_hours)
@@ -134,7 +152,7 @@ class Data:
             print("New mean/std:",
                   self.cross_vals[auction_name]['error'].mean(), self.cross_vals[auction_name]['error'].std())
 
-    def add_prices_to_train(self, auction_name):
+    def realize_prices(self, auction_name):
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
         auction_prices = self.testing_data[auction_name].loc[date_mask, 'y'].values
         self.prediction_day[f'y_{auction_name}'] = auction_prices
@@ -152,7 +170,7 @@ class Data:
                                    suffixes=('', f'_{auction_name}'))
             self.training_data[key] = merged_data
 
-    def get_real_prices(self, auction_name):
+    def get_actual_prices(self, auction_name):
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
         return self.testing_data[auction_name].loc[date_mask, 'y'].dropna().values
 
@@ -162,9 +180,15 @@ class Data:
             'y', 'ds']].dropna()
         plt.plot(real_prices['ds'], real_prices['y'], label='Real Prices')
         for scenario in scenarios:
-            plt.plot(real_prices['ds'], scenario, label='Scenario')
+            plt.plot(real_prices['ds'], scenario)
         plt.legend()
         plt.show()
+
+    def calculate_mae(self, auction_name, forecast):
+        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
+        actual_prices = self.testing_data[auction_name].loc[date_mask, 'y'].dropna(
+        ).values
+        return np.mean(np.abs(actual_prices - forecast))
 
 
 class EMS:
@@ -175,7 +199,8 @@ class EMS:
 
     def __forecast(self, auction_name):
         try:
-            forecast = self.data.get_forecast(auction_name)
+            forecast = self.data.get_forecast_from_file(auction_name)
+            print("MAE:", self.data.calculate_mae(auction_name, forecast))
             return forecast
         except:
             train = self.data.training_data[auction_name]
@@ -194,9 +219,9 @@ class EMS:
 
             trading_length = len(trading_hours) * 2
 
-            print("train columns:", train.columns)
-            print("X_df columns:", X_df.columns)
-            print("horizon:", len(X_df))
+            # print("train columns:", train.columns)
+            # print("X_df columns:", X_df.columns)
+            # print("horizon:", len(X_df))
             print("timeframe:", X_df['ds'].iloc[0], "to", X_df['ds'].iloc[-1])
             model = self.__create_mstl(
                 seasons=[trading_length, 2*trading_length, 5*trading_length, 6*trading_length])
@@ -205,6 +230,8 @@ class EMS:
 
             forecast.reset_index(drop=True, inplace=True)
             forecast['ds'] = X_df['ds'].reset_index(drop=True)
+            print("MAE:", self.data.calculate_mae(
+                auction_name, forecast['MSTL'].values))
             forecast.to_excel(
                 f'./Data/Forecasts/{auction_name}/{self.data.date}_exo{exos}.xlsx', index=False)
             return forecast['MSTL'].values
@@ -221,41 +248,76 @@ class EMS:
         )
         return sf
 
-    def __generate_scenarios(self, predictions, auction_name):
+    def __generate_block_scenarios(self, predictions, auction_name, block_size=6):
         cross_val = self.data.cross_vals[auction_name]
-        grouped = cross_val.groupby(
-            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])
-        error_distr = grouped['error'].describe()
+        error_series = cross_val['error'].values
 
-        num_scenarios = 10
-        percentiles = np.linspace(10, 90, num_scenarios)
+        num_blocks = len(error_series) - block_size + 1
+        error_blocks = np.array([error_series[i:i+block_size]
+                                for i in range(num_blocks)])
 
         scenarios = []
-        for percentile in percentiles:
-            errors_per_halfhour = error_distr.apply(lambda row: np.percentile(np.random.normal(
-                row['mean'], row['std'], 10000), percentile), axis=1).values
-            scenario = predictions + errors_per_halfhour
+        for _ in range(NUM_SCENARIOS):
+            # Randomly sample entire blocks of errors
+            sampled_blocks = np.random.choice(
+                range(num_blocks), size=(len(predictions) // block_size))
+            sampled_errors = np.hstack(
+                [error_blocks[idx] for idx in sampled_blocks])
+
+            scenario = predictions + sampled_errors[:len(predictions)]
             scenarios.append(scenario)
 
-        shifted_scenarios = []
-        for i in range(len(scenarios)):
-            shifted_scenarios.append(np.roll(scenarios[i], shift=-2))
+        if SHOW_SCENARIOS:
+            self.data.plot_scenarios(scenarios, auction_name)
+        return np.array(scenarios)
 
-        scenario_set = np.vstack([scenarios, shifted_scenarios])
-        scenarios_df = pd.DataFrame(scenario_set).T
+    def __generate_scenarios(self, predictions, auction_name):
+        cross_val = self.data.cross_vals[auction_name]
+        plt.plot(cross_val.groupby(
+            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error'].mean().values)
+        plt.show()
 
-        res = [scenarios_df[col].tolist() for col in scenarios_df.columns]
-        self.data.plot_scenarios(res, auction_name)
+        grouped = cross_val.groupby(
+            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])
+        error_distr = grouped['error'].agg(['mean', 'std'])
+
+        num_scenarios = 10
+        percentiles = np.linspace(5, 95, num_scenarios)
+        sampled_errors = np.random.normal(error_distr['mean'].values[:, None],
+                                          error_distr['std'].values[:, None],
+                                          (len(error_distr), 10000))
+        print("Sampled errors shape:", sampled_errors.shape)
+        scenario_errors = np.percentile(sampled_errors, percentiles, axis=1)
+        scenarios = predictions[:, None] + scenario_errors.T
+
+        y_peaks = cross_val.groupby(cross_val['ds'].dt.day)[
+            'y'].apply(list).apply(lambda row: np.argmax(row))
+        mstl_peaks = cross_val.groupby(cross_val['ds'].dt.day)[
+            'MSTL'].apply(list).apply(lambda row: np.argmax(row))
+        peaks_errors = mstl_peaks - y_peaks
+
+        shift_value = int(np.floor(peaks_errors.mean()))
+        if shift_value != 0:
+            print("Shift value:", shift_value)
+            shifted_scenarios = np.roll(scenarios, shift=-shift_value, axis=0)
+            scenarios = np.hstack([scenarios, shifted_scenarios])
+
+        scenarios_df = pd.DataFrame(scenarios)
+        res = scenarios_df.values.T.tolist()
+
+        if SHOW_SCENARIOS:
+            self.data.plot_scenarios(res, auction_name)
+
         return res
 
-    def __get_start_times(self, auction_name):
+    def __get_trading_window(self, auction_name):
         start_time_y = self.data.training_data[auction_name].dropna()[
             'ds'].dt.hour.min() * 2
         end_time_y = (self.data.training_data[auction_name].dropna()[
             'ds'].dt.hour.max() + 1) * 2
         return start_time_y, end_time_y
 
-    def __calc_profit(self, schedules):
+    def __calculate_profit(self, schedules):
         profit = 0
         for auction in ['DA', 'IDA1', 'IDA2']:
             if auction in schedules:
@@ -293,20 +355,17 @@ class EMS:
         power_ax.legend()
         plt.show()
 
-    def __plot_cvars(self, first_stage, second_stage, soc):
+    def __plot_cvars(self, first_stage_forecast, second_stage_scenarios,
+                     start_time_y, end_time_y, soc):
         res = {}
-        first_stage_forecast = self.__forecast(first_stage)
-        second_stage_scenarios = self.__generate_scenarios(
-            self.__forecast(second_stage), second_stage)
-        start_time_y, end_time_y = self.__get_start_times(second_stage)
 
         for l in np.linspace(0, 1, 11):
-            print(f"Risk Averse Factor: {l}")
-            bids, adjustments, _, cvar, e_scenarios_profit = self.__solve_cvar(
+            # print(f"Risk Averse Factor: {l}")
+            bids, adjustments, _, cvar, e_scenarios_profit = self.__solve_two_stage(
                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, soc, risk_averse_factor=l)
 
-            scenario_profits = [np.dot(-np.array(first_stage_forecast), bids) + np.dot(-np.array(prices), trades)
-                                for trades, prices in zip(adjustments, second_stage_scenarios)]
+            scenario_profits = [np.dot(-np.array(first_stage_forecast), bids) + np.dot(-np.array(
+                prices), trades) for trades, prices in zip(adjustments, second_stage_scenarios)]
 
             res[l] = {
                 "cvar": cvar,
@@ -316,9 +375,9 @@ class EMS:
                 "expected profit": np.dot(-np.array(first_stage_forecast), bids) +
                 e_scenarios_profit,
             }
-            for key, value in res[l].items():
-                print(f"{key}: {value}")
-            print('\n')
+            # for key, value in res[l].items():
+            #     print(f"{key}: {value}")
+            # print('\n')
 
         risk_averse_factors = list(res.keys())
         worst_cases = [res[l]["worst-case"] for l in risk_averse_factors]
@@ -337,9 +396,9 @@ class EMS:
         plt.legend()
         plt.show()
 
-    def __solve_cvar(self, x_forecasted, y_scenarios,
-                     start_time_y, end_time_y, prev_bids=[0]*HORIZON,
-                     risk_averse_factor=RISK_AVERSE_FACTOR):
+    def __solve_two_stage(self, x_forecasted, y_scenarios,
+                          start_time_y, end_time_y, prev_bids=[0]*HORIZON,
+                          risk_averse_factor=RISK_AVERSE_FACTOR):
 
         model = gp.Model("Master Combined")
         model.setParam('OutputFlag', 0)  # Turn off Gurobi output
@@ -460,7 +519,7 @@ class EMS:
         else:
             raise Exception("Master is infeasible")
 
-    def run_day(self):
+    def __run_day(self):
         print("Forecasting day:", self.data.date)
 
         first_stage = "DA"
@@ -474,58 +533,69 @@ class EMS:
             print("Second stage:", second_stage)
 
             first_stage_forecast = self.__forecast(first_stage)
-            second_stage_scenarios = self.__generate_scenarios(
+            first_stage_actual = self.data.get_actual_prices(first_stage)
+            second_stage_scenarios = self.__generate_block_scenarios(
                 self.__forecast(second_stage), second_stage)
-            first_stage_actual = self.data.get_real_prices(first_stage)
-            second_stage_actual = self.data.get_real_prices(second_stage)
+            start_time_y, end_time_y = self.__get_trading_window(second_stage)
 
-            start_time_y, end_time_y = self.__get_start_times(second_stage)
+            if PLOT_CVARS:
+                self.__plot_cvars(first_stage, first_stage_forecast,
+                                  second_stage, second_stage_scenarios, soc)
 
-            # self.__plot_cvars(first_stage, second_stage, soc)
-            bids, ys, soc_ys, cvar, _ = self.__solve_cvar(
+            bids, ys, soc_ys, cvar, _ = self.__solve_two_stage(
                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, soc, RISK_AVERSE_FACTOR)
             soc = np.add(soc, bids)
-
-            # for y, prices, soc in zip(ys, second_stage_scenarios, soc_ys):
-            #     bids_y = [0] * start_time_y + y + [0] * (HORIZON - end_time_y)
-            #     price_scenario = [np.nan] * start_time_y + \
-            #         prices + [np.nan]*(HORIZON - end_time_y)
-            #     self.__show_schedule({first_stage: bids, second_stage: bids_y},
-            #                          [first_stage_forecast, price_scenario],
-            #                          soc)
-
             schedules[first_stage] = bids
-            self.data.add_prices_to_train(first_stage)
-            first_stage = second_stage
-            second_stage = next_stages.pop(0) if next_stages else None
+
+            # if PLOT_SCENARIO_SCHEDULES:
+            #     for y, prices, soc in zip(ys, second_stage_scenarios, soc_ys):
+            #         bids_y = [0] * start_time_y + y + \
+            #             [0] * (HORIZON - end_time_y)
+            #         price_scenario = [np.nan] * start_time_y + \
+            #             prices + [np.nan]*(HORIZON - end_time_y)
+            #         self.__show_schedule({first_stage: bids, second_stage: bids_y},
+            #                              [first_stage_forecast, price_scenario],
+            #                              soc)
 
             scenario_profits = [np.dot(-np.array(prices), y)
                                 for prices, y in zip(second_stage_scenarios, ys)]
-            stats[first_stage] = {
+            stats[f'{first_stage} - {second_stage}'] = {
                 'cvar': cvar,
-                'actual_profit': np.dot(-np.array(first_stage_actual), bids),
+                'profit': np.dot(-np.array(first_stage_actual), bids),
                 'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids),
                 'scenario_stats': {
-                    'total_profit_std': np.std(scenario_profits),
-                    'total_max_profit': max(scenario_profits),
-                    'total_min_profit': min(scenario_profits)
+                    f'{second_stage}_profit_std': np.std(scenario_profits),
+                    f'{second_stage}_max_profit': max(scenario_profits),
+                    f'{second_stage}_min_profit': min(scenario_profits)
                 }
             }
+
+            self.data.realize_prices(first_stage)
+            first_stage = second_stage
+            second_stage = next_stages.pop(0) if next_stages else None
             print("\n")
 
         print("First stage:", first_stage)
-        start_time, end_time = self.__get_start_times(first_stage)
+        start_time, end_time = self.__get_trading_window(first_stage)
         bids, final_soc = self.__solve_single(
             self.__forecast(first_stage), soc, start_time, end_time)
-        schedules[first_stage] = bids[start_time:end_time]
-        self.data.add_prices_to_train(first_stage)
 
-        total_profit = self.__calc_profit(schedules)
+        self.data.realize_prices(first_stage)
+        total_profit = self.__calculate_profit({
+            **schedules,
+            first_stage: bids[start_time:end_time]
+        })
         schedules[first_stage] = bids
 
-        realized_prices = [
-            self.data.prediction_day[f'y_{auction}'] for auction in schedules.keys()]
-        # self.__show_schedule(schedules, realized_prices, final_soc)
+        stats[first_stage] = {
+            'profit': np.dot(-np.array(self.data.get_actual_prices(first_stage)), bids[start_time:end_time]),
+            'forecasted_profit': np.dot(-np.array(self.__forecast(first_stage)), bids[start_time:end_time]),
+        }
+
+        if PLOT_FINAL_SCHEDULE:
+            realized_prices = [
+                self.data.prediction_day[f'y_{auction}'] for auction in schedules.keys()]
+            self.__show_schedule(schedules, realized_prices, final_soc)
 
         print("\n")
         return stats, total_profit
@@ -535,7 +605,7 @@ class EMS:
         for i in range(num_days):
             print(f'\nRunning day {self.data.date}')
             print("=====================================\n")
-            stages, profit = self.run_day()
+            stages, profit = self.__run_day()
             results[self.data.date.strftime('%Y-%m-%d')] = {
                 'overall_profit': profit,
                 'stages': stages
@@ -544,7 +614,5 @@ class EMS:
         return results
 
 
-ems = EMS(Data())
-results = ems.run(10)
-pretty_printed = json.dumps(results, indent=4)
-print(pretty_printed)
+if __name__ == '__main__':
+    main()
