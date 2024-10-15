@@ -36,7 +36,7 @@ CAPACITY = 20  # MWh
 MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
-RISK_AVERSE_FACTOR = 0
+RISK_AVERSE_FACTOR = 0.5
 BETA = 0.95
 
 
@@ -90,10 +90,11 @@ class Data:
             f"Retrieving: ./Data/Forecasts/{auction_name}/{self.date}_exo{exo_vars}.xlsx")
 
         forecast = pd.read_excel(
-            f'./Data/Forecasts/{auction_name}/{self.date}_exo{exo_vars}.xlsx',)
+            f'./Data/Forecasts/{auction_name}/{self.date}_exo{exo_vars}.xlsx')
         return forecast['MSTL'].values
 
     def move_to_next_day(self):
+        self.__update_cross_vals()
         self.date += pd.Timedelta(days=1)
         self.training_data['DA'] = self.da[self.da['ds'].dt.date <
                                            self.date]
@@ -111,6 +112,27 @@ class Data:
             'ds': pd.date_range(start=self.date, periods=48, freq='30min'),
             'unique_id': 1,
         })
+
+    def __update_cross_vals(self):
+        for auction_name in self.cross_vals.keys():
+            print(f"Updating cross-validation for {auction_name}")
+            cross_val = self.cross_vals[auction_name]
+            auction_prices = self.get_real_prices(auction_name)
+            forecasted = self.get_forecast(auction_name)
+            trading_hours = cross_val['ds'].dt.hour.unique()
+            timeframe_mask = self.prediction_day['ds'].dt.floor(
+                'h').dt.hour.isin(trading_hours)
+            df = pd.DataFrame({
+                'ds': self.prediction_day['ds'].loc[timeframe_mask],
+                'y': auction_prices,
+                'MSTL': forecasted,
+                'error': auction_prices - forecasted
+            })
+            print("Old mean/std:",
+                  cross_val['error'].mean(), cross_val['error'].std())
+            self.cross_vals[auction_name] = pd.concat([cross_val, df])
+            print("New mean/std:",
+                  self.cross_vals[auction_name]['error'].mean(), self.cross_vals[auction_name]['error'].std())
 
     def add_prices_to_train(self, auction_name):
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
@@ -134,10 +156,15 @@ class Data:
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
         return self.testing_data[auction_name].loc[date_mask, 'y'].dropna().values
 
-    # def plot_scenarios(self, scenarios, auction_name):
-    #     date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-    #     real_prices = self.testing_data[auction_name].loc[date_mask, ['y', 'ds']]
-    #     plt.plot(real_prices['ds'], real_prices['y'], label='Real Prices')
+    def plot_scenarios(self, scenarios, auction_name):
+        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
+        real_prices = self.testing_data[auction_name].loc[date_mask, [
+            'y', 'ds']].dropna()
+        plt.plot(real_prices['ds'], real_prices['y'], label='Real Prices')
+        for scenario in scenarios:
+            plt.plot(real_prices['ds'], scenario, label='Scenario')
+        plt.legend()
+        plt.show()
 
 
 class EMS:
@@ -200,24 +227,26 @@ class EMS:
             [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])
         error_distr = grouped['error'].describe()
 
-        errors_high = error_distr.apply(lambda row: np.percentile(np.random.normal(
-            row['mean'], row['std'], 10000), 90), axis=1)
-        errors_middle = error_distr.apply(lambda row: np.percentile(np.random.normal(
-            row['mean'], row['std'], 10000), 50), axis=1)
-        errors_low = error_distr.apply(lambda row: np.percentile(np.random.normal(
-            row['mean'], row['std'], 10000), 10), axis=1)
+        num_scenarios = 10
+        percentiles = np.linspace(10, 90, num_scenarios)
 
-        scenarios = np.vstack(
-            [errors_high, errors_middle, errors_low]) + predictions
+        scenarios = []
+        for percentile in percentiles:
+            errors_per_halfhour = error_distr.apply(lambda row: np.percentile(np.random.normal(
+                row['mean'], row['std'], 10000), percentile), axis=1).values
+            scenario = predictions + errors_per_halfhour
+            scenarios.append(scenario)
 
         shifted_scenarios = []
         for i in range(len(scenarios)):
             shifted_scenarios.append(np.roll(scenarios[i], shift=-2))
 
-        scenario_set = np.vstack([scenarios, *shifted_scenarios])
+        scenario_set = np.vstack([scenarios, shifted_scenarios])
         scenarios_df = pd.DataFrame(scenario_set).T
 
-        return [scenarios_df[col].tolist() for col in scenarios_df.columns]
+        res = [scenarios_df[col].tolist() for col in scenarios_df.columns]
+        self.data.plot_scenarios(res, auction_name)
+        return res
 
     def __get_start_times(self, auction_name):
         start_time_y = self.data.training_data[auction_name].dropna()[
