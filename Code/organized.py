@@ -36,8 +36,8 @@ CAPACITY = 20  # MWh
 MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
-NUM_SCENARIOS = 100
-RISK_AVERSE_FACTOR = 0.5
+NUM_SCENARIOS = 30
+RISK_AVERSE_FACTOR = 1
 BETA = 0.95
 
 PLOT_CVARS = False
@@ -49,13 +49,15 @@ SHOW_SCENARIOS = False
 def main():
     ems = EMS(Data())
     max_days = ems.data.testing_data['DA'].shape[0] // 48
-    results = ems.run(15)
+    results = ems.run(1)
     # pretty_printed = json.dumps(results, indent=4)
     # print(pretty_printed)
     profits = [day['overall_profit'] for day in results.values()]
-    print("\nTotal profit:", sum(profits))
+    print("\nMin:", min(profits))
+    print("Max:", max(profits))
     print("Mean:", np.mean(profits))
     print("Standard deviation:", np.std(profits))
+    print("Total profit:", sum(profits))
 
 
 class Data:
@@ -112,7 +114,7 @@ class Data:
         return forecast['MSTL'].values
 
     def move_to_next_day(self):
-        self.__update_cross_vals()
+        self.__update_past_errors()
         self.date += pd.Timedelta(days=1)
         self.training_data['DA'] = self.da[self.da['ds'].dt.date <
                                            self.date]
@@ -131,7 +133,7 @@ class Data:
             'unique_id': 1,
         })
 
-    def __update_cross_vals(self):
+    def __update_past_errors(self):
         for auction_name in self.cross_vals.keys():
             print(f"Updating cross-validation for {auction_name}")
             cross_val = self.cross_vals[auction_name]
@@ -147,10 +149,10 @@ class Data:
                 'error': auction_prices - forecasted
             })
             print("Old mean/std:",
-                  cross_val['error'].mean(), cross_val['error'].std())
+                  cross_val['error'].mean(), cross_val['error'].std(), len(cross_val))
             self.cross_vals[auction_name] = pd.concat([cross_val, df])
             print("New mean/std:",
-                  self.cross_vals[auction_name]['error'].mean(), self.cross_vals[auction_name]['error'].std())
+                  self.cross_vals[auction_name]['error'].mean(), self.cross_vals[auction_name]['error'].std(), len(self.cross_vals[auction_name]), '\n')
 
     def realize_prices(self, auction_name):
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
@@ -248,8 +250,59 @@ class EMS:
         )
         return sf
 
-    def __generate_block_scenarios(self, predictions, auction_name, block_size=6):
+    def __generate_block_scenarios(self, predictions, auction_name, block_size=3):
+        cross_val = self.data.cross_vals[auction_name].copy()
+        trading_hours = self.data.training_data[auction_name].dropna()['ds'].dt.hour.unique(
+        )
+        timeframe_mask = self.data.prediction_day['ds'].dt.floor(
+            'h').dt.hour.isin(trading_hours)
+        predictions = pd.DataFrame({
+            'ds': self.data.prediction_day['ds'].loc[timeframe_mask],
+            'MSTL': predictions
+        })
+
+        cross_val['hour'] = cross_val['ds'].dt.hour
+        cross_val['minute'] = cross_val['ds'].dt.minute
+        error_trends = cross_val.groupby([cross_val['hour'], cross_val['minute']])[
+            'error'].agg(['mean', 'std']).reset_index()
+
+        scenarios = []
+        percentiles = np.linspace(5, 95, NUM_SCENARIOS)
+        for percentile in percentiles:
+            sampled_errors = []
+            for i in range(len(predictions) // block_size):
+                timestamp = predictions['ds'].iloc[i * block_size]
+                hour = timestamp.hour
+                minute = timestamp.minute
+                error_info = error_trends[(error_trends['hour'] == hour) & (
+                    error_trends['minute'] == minute)]
+                if not error_info.empty:
+                    mean = error_info['mean'].values[0]
+                    std = error_info['std'].values[0]
+
+                    # Sample a single error for the block based on the time-specific mean and std
+                    block_error = np.percentile(
+                        np.random.normal(mean, std, 10000), percentile)
+
+                    # Apply the same error to the entire block
+                    block_errors = np.full(block_size, block_error)
+                    sampled_errors.append(block_errors)
+
+            # Flatten the sampled errors into a single array and apply to predictions
+            sampled_errors = np.hstack(sampled_errors)[:len(predictions)]
+            scenario = predictions['MSTL'].values + sampled_errors
+            scenario = pd.Series(scenario).rolling(
+                window=3).mean().bfill().values
+
+            scenarios.append(scenario)
+
+        if SHOW_SCENARIOS:
+            self.data.plot_scenarios(scenarios, auction_name)
+        return np.array(scenarios)
+
+    # def __generate_block_scenarios(self, predictions, auction_name, block_size=6):
         cross_val = self.data.cross_vals[auction_name]
+
         error_series = cross_val['error'].values
 
         num_blocks = len(error_series) - block_size + 1
@@ -258,7 +311,6 @@ class EMS:
 
         scenarios = []
         for _ in range(NUM_SCENARIOS):
-            # Randomly sample entire blocks of errors
             sampled_blocks = np.random.choice(
                 range(num_blocks), size=(len(predictions) // block_size))
             sampled_errors = np.hstack(
@@ -273,9 +325,9 @@ class EMS:
 
     def __generate_scenarios(self, predictions, auction_name):
         cross_val = self.data.cross_vals[auction_name]
-        plt.plot(cross_val.groupby(
-            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error'].mean().values)
-        plt.show()
+        # plt.plot(cross_val.groupby(
+        #     [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error'].mean().values)
+        # plt.show()
 
         grouped = cross_val.groupby(
             [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])
@@ -539,8 +591,8 @@ class EMS:
             start_time_y, end_time_y = self.__get_trading_window(second_stage)
 
             if PLOT_CVARS:
-                self.__plot_cvars(first_stage, first_stage_forecast,
-                                  second_stage, second_stage_scenarios, soc)
+                self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
+                                  end_time_y, soc)
 
             bids, ys, soc_ys, cvar, _ = self.__solve_two_stage(
                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, soc, RISK_AVERSE_FACTOR)
