@@ -1,4 +1,6 @@
 import json
+import os
+import random
 import numpy as np
 import pandas as pd
 from statsforecast import StatsForecast
@@ -32,32 +34,37 @@ plt.rcParams['figure.figsize'] = (15, 10)
 HORIZON = 48
 
 POWER = 10  # MW
-CAPACITY = 20  # MWh
+CAPACITY = 40  # MWh
 MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
-NUM_SCENARIOS = 30
-RISK_AVERSE_FACTOR = 1
+NUM_SCENARIOS = 100
+RISK_AVERSE_FACTOR = 0
 BETA = 0.95
 
+SHOW_FINAL_SCHEDULE = False
 PLOT_CVARS = False
-PLOT_SCENARIO_SCHEDULES = False
-PLOT_FINAL_SCHEDULE = False
 SHOW_SCENARIOS = False
+# PLOT_SCENARIO_SCHEDULES = False
 
 
 def main():
     ems = EMS(Data())
     max_days = ems.data.testing_data['DA'].shape[0] // 48
-    results = ems.run(1)
-    # pretty_printed = json.dumps(results, indent=4)
-    # print(pretty_printed)
-    profits = [day['overall_profit'] for day in results.values()]
-    print("\nMin:", min(profits))
-    print("Max:", max(profits))
-    print("Mean:", np.mean(profits))
-    print("Standard deviation:", np.std(profits))
-    print("Total profit:", sum(profits))
+    results = ems.run(5)
+
+    results_dir = 'results'
+    os.makedirs(results_dir, exist_ok=True)
+    subfolder_name = f'battery_{POWER}MW_{CAPACITY}MWh'
+    subfolder_path = os.path.join(results_dir, subfolder_name)
+    if not os.path.exists(subfolder_path):
+        os.makedirs(subfolder_path)
+    subfolder_path = os.path.join(results_dir, subfolder_name)
+    os.makedirs(subfolder_path, exist_ok=True)
+    results_file = os.path.join(
+        subfolder_path, f'run_results_l={RISK_AVERSE_FACTOR}.json')
+    with open(results_file, 'w') as f:
+        json.dump(results, f, indent=4)
 
 
 class Data:
@@ -111,6 +118,7 @@ class Data:
 
         forecast = pd.read_excel(
             f'./Data/Forecasts/{auction_name}/{self.date}_exo{exo_vars}.xlsx')
+
         return forecast['MSTL'].values
 
     def move_to_next_day(self):
@@ -150,7 +158,9 @@ class Data:
             })
             print("Old mean/std:",
                   cross_val['error'].mean(), cross_val['error'].std(), len(cross_val))
-            self.cross_vals[auction_name] = pd.concat([cross_val, df])
+            day_length = cross_val['ds'].dt.floor('d').value_counts().iloc[0]
+            self.cross_vals[auction_name] = pd.concat(
+                [cross_val.iloc[day_length:], df]).reset_index(drop=True)
             print("New mean/std:",
                   self.cross_vals[auction_name]['error'].mean(), self.cross_vals[auction_name]['error'].std(), len(self.cross_vals[auction_name]), '\n')
 
@@ -186,11 +196,15 @@ class Data:
         plt.legend()
         plt.show()
 
-    def calculate_mae(self, auction_name, forecast):
+    def calculate_smape(self, auction_name, forecast):
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-        actual_prices = self.testing_data[auction_name].loc[date_mask, 'y'].dropna(
+        actual = self.testing_data[auction_name].loc[date_mask, 'y'].dropna(
         ).values
-        return np.mean(np.abs(actual_prices - forecast))
+        return round(
+            np.mean(
+                np.abs(forecast - actual) /
+                    ((np.abs(forecast) + np.abs(actual))/2)
+            )*100, 2)
 
 
 class EMS:
@@ -202,7 +216,7 @@ class EMS:
     def __forecast(self, auction_name):
         try:
             forecast = self.data.get_forecast_from_file(auction_name)
-            print("MAE:", self.data.calculate_mae(auction_name, forecast))
+            print("SMAPE:", self.data.calculate_smape(auction_name, forecast))
             return forecast
         except:
             train = self.data.training_data[auction_name]
@@ -221,24 +235,22 @@ class EMS:
 
             trading_length = len(trading_hours) * 2
 
-            # print("train columns:", train.columns)
-            # print("X_df columns:", X_df.columns)
-            # print("horizon:", len(X_df))
             print("timeframe:", X_df['ds'].iloc[0], "to", X_df['ds'].iloc[-1])
             model = self.__create_mstl(
-                seasons=[trading_length, 2*trading_length, 5*trading_length, 6*trading_length])
+                seasons=[trading_length, 2*trading_length])
             forecast = model.forecast(
                 df=train, h=len(X_df), X_df=X_df)
 
             forecast.reset_index(drop=True, inplace=True)
             forecast['ds'] = X_df['ds'].reset_index(drop=True)
-            print("MAE:", self.data.calculate_mae(
+
+            print("SMAPE:", self.data.calculate_smape(
                 auction_name, forecast['MSTL'].values))
             forecast.to_excel(
                 f'./Data/Forecasts/{auction_name}/{self.data.date}_exo{exos}.xlsx', index=False)
             return forecast['MSTL'].values
 
-    def __create_mstl(self, seasons=[48, 2*48, 5*48, 6*48]):
+    def __create_mstl(self, seasons):
         models = [
             MSTL(season_length=seasons,
                  trend_forecaster=AutoARIMA(seasonal=True)
@@ -250,7 +262,28 @@ class EMS:
         )
         return sf
 
-    def __generate_block_scenarios(self, predictions, auction_name, block_size=3):
+    def __block_scenario_sampling(self, ida1_prediction, auction_name, block_size=8):
+        cross_val = self.data.cross_vals[auction_name].copy()
+        blocks_by_day = [
+            group['error'].values.reshape(-1, block_size) for _, group in cross_val.groupby(cross_val['ds'].dt.date)]
+        grouped_blocks = list(zip(*blocks_by_day))
+
+        scenarios = []
+        for _ in range(NUM_SCENARIOS):
+            scenario = []
+            for block_index, block in enumerate(grouped_blocks):
+                correlated_block = random.choice(block)
+                ida1_prediction_block = ida1_prediction[block_index * block_size:(
+                    block_index + 1) * block_size]
+                scenario.extend(ida1_prediction_block + correlated_block)
+            scenarios.append(scenario)
+
+        scenarios = np.array(scenarios)
+        if SHOW_SCENARIOS:
+            self.data.plot_scenarios(scenarios, auction_name)
+        return scenarios
+
+    def __generate_block_scenarios(self, predictions, auction_name, block_size=8):
         cross_val = self.data.cross_vals[auction_name].copy()
         trading_hours = self.data.training_data[auction_name].dropna()['ds'].dt.hour.unique(
         )
@@ -586,7 +619,7 @@ class EMS:
 
             first_stage_forecast = self.__forecast(first_stage)
             first_stage_actual = self.data.get_actual_prices(first_stage)
-            second_stage_scenarios = self.__generate_block_scenarios(
+            second_stage_scenarios = self.__block_scenario_sampling(
                 self.__forecast(second_stage), second_stage)
             start_time_y, end_time_y = self.__get_trading_window(second_stage)
 
@@ -611,10 +644,13 @@ class EMS:
 
             scenario_profits = [np.dot(-np.array(prices), y)
                                 for prices, y in zip(second_stage_scenarios, ys)]
-            stats[f'{first_stage} - {second_stage}'] = {
+            stats[first_stage] = {
                 'cvar': cvar,
+                'volume_traded': sum([abs(bid) for bid in bids]),
+                'net_volume_traded': sum(bids),
                 'profit': np.dot(-np.array(first_stage_actual), bids),
                 'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids),
+                'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast),
                 'scenario_stats': {
                     f'{second_stage}_profit_std': np.std(scenario_profits),
                     f'{second_stage}_max_profit': max(scenario_profits),
@@ -622,15 +658,17 @@ class EMS:
                 }
             }
 
-            self.data.realize_prices(first_stage)
+            if first_stage != "IDA1":
+                self.data.realize_prices(first_stage)
             first_stage = second_stage
             second_stage = next_stages.pop(0) if next_stages else None
             print("\n")
 
         print("First stage:", first_stage)
         start_time, end_time = self.__get_trading_window(first_stage)
+        first_stage_forecast = self.__forecast(first_stage)
         bids, final_soc = self.__solve_single(
-            self.__forecast(first_stage), soc, start_time, end_time)
+            first_stage_forecast, soc, start_time, end_time)
 
         self.data.realize_prices(first_stage)
         total_profit = self.__calculate_profit({
@@ -640,30 +678,38 @@ class EMS:
         schedules[first_stage] = bids
 
         stats[first_stage] = {
+            'volume_traded': sum([abs(bid) for bid in bids]),
+            'net_volume_traded': sum(bids),
             'profit': np.dot(-np.array(self.data.get_actual_prices(first_stage)), bids[start_time:end_time]),
-            'forecasted_profit': np.dot(-np.array(self.__forecast(first_stage)), bids[start_time:end_time]),
+            'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids[start_time:end_time]),
+            'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast)
         }
 
-        if PLOT_FINAL_SCHEDULE:
+        if SHOW_FINAL_SCHEDULE:
             realized_prices = [
                 self.data.prediction_day[f'y_{auction}'] for auction in schedules.keys()]
             self.__show_schedule(schedules, realized_prices, final_soc)
 
-        print("\n")
         return stats, total_profit
 
     def run(self, num_days):
         results = {}
-        for i in range(num_days):
+        for _ in range(num_days):
             print(f'\nRunning day {self.data.date}')
             print("=====================================\n")
             stages, profit = self.__run_day()
             results[self.data.date.strftime('%Y-%m-%d')] = {
-                'overall_profit': profit,
-                'stages': stages
+                'profit': profit,
+                'auctions': stages,
             }
             self.data.move_to_next_day()
-        return results
+            print("\n")
+
+        return {
+            'risk_averse_factor': RISK_AVERSE_FACTOR,
+            'overall_profit': sum([day['profit'] for day in results.values()]),
+            'results': results
+        }
 
 
 if __name__ == '__main__':
