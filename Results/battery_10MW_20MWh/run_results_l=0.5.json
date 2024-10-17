@@ -1,194 +1,1182 @@
 {
     "risk_averse_factor": 0.5,
-    "overall_profit": 17791.483710681336,
+    "overall_profit": 75947.32143161248,
     "results": {
         "2023-12-01": {
-            "profit": 6060.882767226186,
+            "profit": 6169.856809608967,
             "auctions": {
                 "DA": {
-                    "cvar": 1476.4584440642188,
-                    "volume_traded": 233.79133509513147,
-                    "net_volume_traded": 63.769606946139604,
-                    "profit": -7152.0546365430255,
-                    "forecasted_profit": -6810.418230028958,
+                    "cvar": 1182.1105227293438,
+                    "volume_traded": 227.96431804717386,
+                    "net_volume_traded": 63.032714387586466,
+                    "profit": -6570.952795686112,
+                    "forecasted_profit": -6226.319329999544,
                     "SMAPE": 17.92,
                     "scenario_stats": {
-                        "IDA1_profit_std": 858.1985297843772,
-                        "IDA1_max_profit": 14524.900708510466,
-                        "IDA1_min_profit": 10778.56944680088
+                        "IDA1_profit_std": 632.713208734602,
+                        "IDA1_max_profit": 13737.821333408903,
+                        "IDA1_min_profit": 10412.461667890337
                     }
                 },
                 "IDA1": {
-                    "cvar": 614.885990874631,
-                    "volume_traded": 197.6975134576615,
-                    "net_volume_traded": -76.38963765245994,
-                    "profit": 13510.758211981869,
-                    "forecasted_profit": 12936.678933222387,
+                    "cvar": 1015.7946194388823,
+                    "volume_traded": 204.98860687587103,
+                    "net_volume_traded": -97.08133421905657,
+                    "profit": 17098.537366410226,
+                    "forecasted_profit": 16458.604606374483,
                     "SMAPE": 9.57,
                     "scenario_stats": {
-                        "IDA2_profit_std": 383.7113131854469,
-                        "IDA2_max_profit": 1277.7015092412541,
-                        "IDA2_min_profit": -613.2771580270257
+                        "IDA2_profit_std": 593.870255814802,
+                        "IDA2_max_profit": -1806.4832605428564,
+                        "IDA2_min_profit": -4989.033380317607
                     }
                 },
                 "IDA2": {
-                    "volume_traded": 60.94228305664574,
-                    "net_volume_traded": 12.62003070632034,
-                    "profit": -297.82080821265714,
-                    "forecasted_profit": -189.43728307326376,
+                    "volume_traded": 67.92832622710418,
+                    "net_volume_traded": 34.048619831470106,
+                    "profit": -4357.727761115147,
+                    "forecasted_profit": -4172.856042247616,
                     "SMAPE": 5.48
                 }
             }
         },
         "2023-12-02": {
-            "profit": 3848.219251703016,
+            "profit": 3877.6775192580444,
             "auctions": {
                 "DA": {
-                    "cvar": 1132.7826319417263,
-                    "volume_traded": 226.6930065652809,
-                    "net_volume_traded": 37.393771059549806,
-                    "profit": -3278.14567824587,
-                    "forecasted_profit": -3533.0423965151285,
+                    "cvar": 1000.5956154019066,
+                    "volume_traded": 234.59664302407225,
+                    "net_volume_traded": 30.313289569381304,
+                    "profit": -2251.341070673866,
+                    "forecasted_profit": -2457.5539525383037,
                     "SMAPE": 15.36,
                     "scenario_stats": {
-                        "IDA1_profit_std": 687.5514060826453,
-                        "IDA1_max_profit": 10337.034964281658,
-                        "IDA1_min_profit": 7607.3378694041585
+                        "IDA1_profit_std": 692.176112478512,
+                        "IDA1_max_profit": 10176.114642238925,
+                        "IDA1_min_profit": 6769.077517175951
                     }
                 },
                 "IDA1": {
-                    "cvar": 2070.461838712614,
-                    "volume_traded": 193.01888543249586,
-                    "net_volume_traded": -104.26446547568708,
-                    "profit": 16063.542459292323,
-                    "forecasted_profit": 19114.051000458487,
+                    "cvar": 2082.1947945157444,
+                    "volume_traded": 198.04894137264964,
+                    "net_volume_traded": -98.42210631608398,
+                    "profit": 15183.335417110262,
+                    "forecasted_profit": 18131.64542386763,
                     "SMAPE": 20.83,
                     "scenario_stats": {
-                        "IDA2_profit_std": 1152.073559660695,
-                        "IDA2_max_profit": -6254.499764314177,
-                        "IDA2_min_profit": -11198.304692725642
+                        "IDA2_profit_std": 1237.4363628030412,
+                        "IDA2_max_profit": -5856.788912281195,
+                        "IDA2_min_profit": -11343.490133359412
                     }
                 },
                 "IDA2": {
-                    "volume_traded": 77.22807721443748,
-                    "net_volume_traded": 66.87069441613727,
-                    "profit": -8937.177529343437,
-                    "forecasted_profit": -8795.66826856663,
+                    "volume_traded": 78.10881674670269,
+                    "net_volume_traded": 68.10881674670269,
+                    "profit": -9054.316827178352,
+                    "forecasted_profit": -8885.220869659406,
                     "SMAPE": 10.87
                 }
             }
         },
         "2023-12-03": {
-            "profit": 2442.9284811842294,
+            "profit": 2493.0900596490706,
             "auctions": {
                 "DA": {
-                    "cvar": 1101.8586130153838,
-                    "volume_traded": 231.17011690501485,
-                    "net_volume_traded": 8.82988309498515,
-                    "profit": -192.973076098011,
-                    "forecasted_profit": 673.464738059201,
+                    "cvar": 822.1723113443032,
+                    "volume_traded": 214.76657373569122,
+                    "net_volume_traded": 4.521453374275019,
+                    "profit": 420.6907608948494,
+                    "forecasted_profit": 1409.5560563801082,
                     "SMAPE": 28.65,
                     "scenario_stats": {
-                        "IDA1_profit_std": 554.5068887409478,
-                        "IDA1_max_profit": 6159.371404039779,
-                        "IDA1_min_profit": 3299.9440677304756
+                        "IDA1_profit_std": 596.9500415619366,
+                        "IDA1_max_profit": 6324.387884589314,
+                        "IDA1_min_profit": 3009.743030044428
                     }
                 },
                 "IDA1": {
-                    "cvar": 644.714711751364,
-                    "volume_traded": 203.32662472332174,
-                    "net_volume_traded": -27.49742490012329,
-                    "profit": 4051.471194187948,
-                    "forecasted_profit": 5658.212240932378,
+                    "cvar": 556.0221548566169,
+                    "volume_traded": 184.90651513038875,
+                    "net_volume_traded": -19.5889015881028,
+                    "profit": 3060.969960585807,
+                    "forecasted_profit": 4423.351833899344,
                     "SMAPE": 22.86,
                     "scenario_stats": {
-                        "IDA2_profit_std": 426.0287610565619,
-                        "IDA2_max_profit": 161.1554883628944,
-                        "IDA2_min_profit": -1553.490972173378
+                        "IDA2_profit_std": 380.0690362657699,
+                        "IDA2_max_profit": 749.0689267062024,
+                        "IDA2_min_profit": -1212.7751075418391
                     }
                 },
                 "IDA2": {
-                    "volume_traded": 66.10758811535663,
-                    "net_volume_traded": 18.66754180513814,
-                    "profit": -1415.5696369057077,
-                    "forecasted_profit": -1512.4657605520333,
+                    "volume_traded": 61.544589393562354,
+                    "net_volume_traded": 15.06744821382778,
+                    "profit": -988.5706618315858,
+                    "forecasted_profit": -1066.7926952890239,
                     "SMAPE": 29.68
                 }
             }
         },
         "2023-12-04": {
-            "profit": 1939.2548578317796,
+            "profit": 2112.0618370529783,
             "auctions": {
                 "DA": {
-                    "cvar": 1016.5736703197153,
-                    "volume_traded": 231.3819958832131,
-                    "net_volume_traded": 0.47303854540057344,
-                    "profit": 1123.0049713851977,
-                    "forecasted_profit": 2121.7012288089295,
+                    "cvar": 955.9589533236573,
+                    "volume_traded": 225.92795469983193,
+                    "net_volume_traded": -8.982926612064173,
+                    "profit": 2208.4194591774403,
+                    "forecasted_profit": 3352.0896013353185,
                     "SMAPE": 7.27,
                     "scenario_stats": {
-                        "IDA1_profit_std": 612.4838986891806,
-                        "IDA1_max_profit": 4660.427306394927,
-                        "IDA1_min_profit": 1677.6400886700153
+                        "IDA1_profit_std": 592.8270162347212,
+                        "IDA1_max_profit": 3196.294168083039,
+                        "IDA1_min_profit": 675.5755017343085
                     }
                 },
                 "IDA1": {
-                    "cvar": 569.1775187324405,
-                    "volume_traded": 212.87067110663617,
-                    "net_volume_traded": -20.608296861996855,
-                    "profit": 2511.5889428411283,
-                    "forecasted_profit": 3371.753914203782,
+                    "cvar": 545.5430799255503,
+                    "volume_traded": 203.64502381792545,
+                    "net_volume_traded": -9.324674436516688,
+                    "profit": 1425.2978247524038,
+                    "forecasted_profit": 1803.3495991435507,
                     "SMAPE": 10.98,
                     "scenario_stats": {
-                        "IDA2_profit_std": 483.1012684134745,
-                        "IDA2_max_profit": 1009.9304219297194,
-                        "IDA2_min_profit": -1229.9076425721466
+                        "IDA2_profit_std": 371.5562485051852,
+                        "IDA2_max_profit": 913.397771873107,
+                        "IDA2_min_profit": -1000.8300713636929
                     }
                 },
                 "IDA2": {
-                    "volume_traded": 57.46553122714327,
-                    "net_volume_traded": 20.135258316596286,
-                    "profit": -1695.3390563945463,
-                    "forecasted_profit": -1270.4862744862733,
+                    "volume_traded": 70.57952906931844,
+                    "net_volume_traded": 18.30760104858086,
+                    "profit": -1521.6554468768659,
+                    "forecasted_profit": -1018.4414808088128,
                     "SMAPE": 13.89
                 }
             }
         },
         "2023-12-05": {
-            "profit": 3500.198352736121,
+            "profit": 3916.738440810831,
             "auctions": {
                 "DA": {
-                    "cvar": 1964.6763781539778,
-                    "volume_traded": 235.45104966983953,
-                    "net_volume_traded": -94.54895033016047,
-                    "profit": 14808.915216225381,
-                    "forecasted_profit": 13195.80319301275,
+                    "cvar": 1592.9125449098228,
+                    "volume_traded": 219.8526245223238,
+                    "net_volume_traded": -62.911941959441066,
+                    "profit": 9235.665034010195,
+                    "forecasted_profit": 8641.747361657908,
                     "SMAPE": 16.96,
                     "scenario_stats": {
-                        "IDA1_profit_std": 1179.9178972928676,
-                        "IDA1_max_profit": -2960.568359102524,
-                        "IDA1_min_profit": -9329.351078806561
+                        "IDA1_profit_std": 856.2505901021403,
+                        "IDA1_max_profit": -387.7016226646276,
+                        "IDA1_min_profit": -4784.141802921959
                     }
                 },
                 "IDA1": {
-                    "cvar": 957.0569101372762,
-                    "volume_traded": 213.4515649667734,
-                    "net_volume_traded": 110.18374991494005,
-                    "profit": -15866.326546149015,
-                    "forecasted_profit": -12514.371663177015,
+                    "cvar": 1059.9681041240844,
+                    "volume_traded": 203.27921877862678,
+                    "net_volume_traded": 78.87838529405192,
+                    "profit": -10352.941757854638,
+                    "forecasted_profit": -7864.609419322816,
                     "SMAPE": 18.49,
                     "scenario_stats": {
-                        "IDA2_profit_std": 563.7255668662214,
-                        "IDA2_max_profit": 6479.776655394306,
-                        "IDA2_min_profit": 3835.5278558002065
+                        "IDA2_profit_std": 655.6553138407705,
+                        "IDA2_max_profit": 7503.064065363665,
+                        "IDA2_min_profit": 3952.7042009508195
                     }
                 },
                 "IDA2": {
-                    "volume_traded": 84.25200871106458,
-                    "net_volume_traded": -15.634799584779579,
-                    "profit": 4557.609682659755,
-                    "forecasted_profit": 4345.923286461362,
+                    "volume_traded": 91.26676836691198,
+                    "net_volume_traded": -15.966443334610862,
+                    "profit": 5034.015164655274,
+                    "forecasted_profit": 4543.552069524627,
                     "SMAPE": 7.04
+                }
+            }
+        },
+        "2023-12-06": {
+            "profit": 2572.517903072921,
+            "auctions": {
+                "DA": {
+                    "cvar": 909.3345633281918,
+                    "volume_traded": 214.37292459882013,
+                    "net_volume_traded": -7.126440077381627,
+                    "profit": 1904.6936840345973,
+                    "forecasted_profit": 2623.8009866993216,
+                    "SMAPE": 15.42,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 639.6281815668685,
+                        "IDA1_max_profit": 3948.5428474510263,
+                        "IDA1_min_profit": 914.3215897595583
+                    }
+                },
+                "IDA1": {
+                    "cvar": 513.6452173561539,
+                    "volume_traded": 199.27561774948597,
+                    "net_volume_traded": 4.953623411478032,
+                    "profit": -23.345529271664873,
+                    "forecasted_profit": -78.02597335680866,
+                    "SMAPE": 12.48,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 373.796157883141,
+                        "IDA2_max_profit": 3112.3695085868517,
+                        "IDA2_min_profit": 1173.833691414747
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 58.9145941909721,
+                    "net_volume_traded": 2.172816665903592,
+                    "profit": 691.1697483099886,
+                    "forecasted_profit": 1028.1911894480413,
+                    "SMAPE": 20.29
+                }
+            }
+        },
+        "2023-12-07": {
+            "profit": 2117.764825564226,
+            "auctions": {
+                "DA": {
+                    "cvar": 1298.1301002605,
+                    "volume_traded": 230.9804012607674,
+                    "net_volume_traded": 29.019598739232585,
+                    "profit": -2122.924716260084,
+                    "forecasted_profit": -2564.3083017253734,
+                    "SMAPE": 26.44,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 851.5635635317834,
+                        "IDA1_max_profit": 10245.693294999593,
+                        "IDA1_min_profit": 6324.984314652633
+                    }
+                },
+                "IDA1": {
+                    "cvar": 597.9882491041554,
+                    "volume_traded": 200.73618665346928,
+                    "net_volume_traded": -33.64028612974825,
+                    "profit": 3934.3097391758693,
+                    "forecasted_profit": 5972.186231270527,
+                    "SMAPE": 30.06,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 504.1654315203793,
+                        "IDA2_max_profit": 3562.342794782108,
+                        "IDA2_min_profit": 899.1855742439728
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 72.3309598712476,
+                    "net_volume_traded": 4.620687390515668,
+                    "profit": 306.3798026484411,
+                    "forecasted_profit": 795.4651310856684,
+                    "SMAPE": 27.31
+                }
+            }
+        },
+        "2023-12-08": {
+            "profit": 1676.6305070638043,
+            "auctions": {
+                "DA": {
+                    "cvar": 1263.239732611086,
+                    "volume_traded": 211.6475019805308,
+                    "net_volume_traded": -46.26027617966029,
+                    "profit": 5353.426992689075,
+                    "forecasted_profit": 5658.793214283496,
+                    "SMAPE": 11.74,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 880.8760887224282,
+                        "IDA1_max_profit": 2535.406939910396,
+                        "IDA1_min_profit": -2583.5750260631185
+                    }
+                },
+                "IDA1": {
+                    "cvar": 738.6389396309154,
+                    "volume_traded": 186.30065690594893,
+                    "net_volume_traded": 47.26264115301088,
+                    "profit": -4365.423209591165,
+                    "forecasted_profit": -3323.212861837267,
+                    "SMAPE": 15.61,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 649.1764622580048,
+                        "IDA2_max_profit": 4793.4483670899235,
+                        "IDA2_min_profit": 1113.3576045708687
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 70.44327460773943,
+                    "net_volume_traded": -1.0023649733505948,
+                    "profit": 688.6267239658944,
+                    "forecasted_profit": 1066.0094873223493,
+                    "SMAPE": 27.82
+                }
+            }
+        },
+        "2023-12-09": {
+            "profit": 1777.6480505454792,
+            "auctions": {
+                "DA": {
+                    "cvar": 2728.88369679463,
+                    "volume_traded": 229.3873997666825,
+                    "net_volume_traded": -109.67391986123418,
+                    "profit": 10229.98903217255,
+                    "forecasted_profit": 14311.733630828241,
+                    "SMAPE": 32.94,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1576.5738878958512,
+                        "IDA1_max_profit": -3637.4441532613637,
+                        "IDA1_min_profit": -11144.212503025188
+                    }
+                },
+                "IDA1": {
+                    "cvar": 769.8655349982823,
+                    "volume_traded": 185.1363919813269,
+                    "net_volume_traded": 110.12527768896003,
+                    "profit": -9159.996456068502,
+                    "forecasted_profit": -10295.986606768764,
+                    "SMAPE": 18.98,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 537.0671203135668,
+                        "IDA2_max_profit": 4284.95753560718,
+                        "IDA2_min_profit": 1602.975993308302
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 67.892431075926,
+                    "net_volume_traded": -0.4513578277258432,
+                    "profit": 707.6554744414306,
+                    "forecasted_profit": 1492.7657891964295,
+                    "SMAPE": 63.14
+                }
+            }
+        },
+        "2023-12-10": {
+            "profit": 1793.1742746623167,
+            "auctions": {
+                "DA": {
+                    "cvar": 1409.4855715381848,
+                    "volume_traded": 233.8738053469303,
+                    "net_volume_traded": 72.53711128075938,
+                    "profit": -3923.6881611092977,
+                    "forecasted_profit": -3345.1954354810205,
+                    "SMAPE": 18.35,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 876.5513042670226,
+                        "IDA1_max_profit": 11129.579228293886,
+                        "IDA1_min_profit": 6869.085497905889
+                    }
+                },
+                "IDA1": {
+                    "cvar": 3821.0842544270126,
+                    "volume_traded": 226.22926219951225,
+                    "net_volume_traded": -173.24940125393633,
+                    "profit": 16388.76220704594,
+                    "forecasted_profit": 18093.51939159482,
+                    "SMAPE": 15.99,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 1939.8177612593418,
+                        "IDA2_max_profit": -2256.9846151092197,
+                        "IDA2_min_profit": -10876.562139706672
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 100.71228997317695,
+                    "net_volume_traded": 100.71228997317695,
+                    "profit": -10671.899771274326,
+                    "forecasted_profit": -7019.949564894318,
+                    "SMAPE": 40.42
+                }
+            }
+        },
+        "2023-12-11": {
+            "profit": 3020.1415179485753,
+            "auctions": {
+                "DA": {
+                    "cvar": 1488.7269551140123,
+                    "volume_traded": 222.59266852188523,
+                    "net_volume_traded": 41.44198518773911,
+                    "profit": -2800.4675155002624,
+                    "forecasted_profit": -2228.817192257906,
+                    "SMAPE": 21.24,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1018.7729808875682,
+                        "IDA1_max_profit": 9922.527239369407,
+                        "IDA1_min_profit": 5048.744676774704
+                    }
+                },
+                "IDA1": {
+                    "cvar": 653.3553005956219,
+                    "volume_traded": 185.81155483412005,
+                    "net_volume_traded": -54.636827759561115,
+                    "profit": 6412.416696662779,
+                    "forecasted_profit": 6362.173070212474,
+                    "SMAPE": 15.66,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 424.5617831899378,
+                        "IDA2_max_profit": 2212.6039901574254,
+                        "IDA2_min_profit": -266.3818800907997
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 76.07026860607161,
+                    "net_volume_traded": 13.194842571822011,
+                    "profit": -591.8076632139414,
+                    "forecasted_profit": -549.1582574071349,
+                    "SMAPE": 14.34
+                }
+            }
+        },
+        "2023-12-12": {
+            "profit": 2385.541978722771,
+            "auctions": {
+                "DA": {
+                    "cvar": 866.9283612942421,
+                    "volume_traded": 218.65394185944086,
+                    "net_volume_traded": 17.362956332682874,
+                    "profit": -545.7104044534635,
+                    "forecasted_profit": -461.7229077183749,
+                    "SMAPE": 18.19,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 636.3352357711547,
+                        "IDA1_max_profit": 6887.258801144036,
+                        "IDA1_min_profit": 3669.1510609906154
+                    }
+                },
+                "IDA1": {
+                    "cvar": 874.8389687800686,
+                    "volume_traded": 182.30321228151848,
+                    "net_volume_traded": -30.189052771040103,
+                    "profit": 3831.6468885541635,
+                    "forecasted_profit": 4372.052878190424,
+                    "SMAPE": 15.33,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 877.1801816483596,
+                        "IDA2_max_profit": 3497.969576408065,
+                        "IDA2_min_profit": -490.7541386371887
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 64.63047863092564,
+                    "net_volume_traded": 12.826096438357236,
+                    "profit": -900.3945053779289,
+                    "forecasted_profit": -745.2719056377906,
+                    "SMAPE": 19.27
+                }
+            }
+        },
+        "2023-12-13": {
+            "profit": 2864.237332925974,
+            "auctions": {
+                "DA": {
+                    "cvar": 1923.0078044830666,
+                    "volume_traded": 229.76577824785883,
+                    "net_volume_traded": -85.54617098621623,
+                    "profit": 10073.709859327952,
+                    "forecasted_profit": 9534.327748654601,
+                    "SMAPE": 14.7,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1009.2322443710945,
+                        "IDA1_max_profit": -1475.0918872278908,
+                        "IDA1_min_profit": -6544.077448492625
+                    }
+                },
+                "IDA1": {
+                    "cvar": 1095.016317436837,
+                    "volume_traded": 201.84615207759552,
+                    "net_volume_traded": 95.14870806805831,
+                    "profit": -9479.62476832186,
+                    "forecasted_profit": -8267.72498027256,
+                    "SMAPE": 14.61,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 665.4342381578186,
+                        "IDA2_max_profit": 5612.538608343073,
+                        "IDA2_min_profit": 2009.0070999810991
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 77.91962617026334,
+                    "net_volume_traded": -9.602537081842083,
+                    "profit": 2270.152241919883,
+                    "forecasted_profit": 2371.0864272758313,
+                    "SMAPE": 15.58
+                }
+            }
+        },
+        "2023-12-14": {
+            "profit": 3159.698238349659,
+            "auctions": {
+                "DA": {
+                    "cvar": 1903.3784767874172,
+                    "volume_traded": 215.75165419237817,
+                    "net_volume_traded": -61.50722437078532,
+                    "profit": 7885.002775343807,
+                    "forecasted_profit": 7864.498708584717,
+                    "SMAPE": 10.66,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1040.3220871178087,
+                        "IDA1_max_profit": -435.13222507026853,
+                        "IDA1_min_profit": -5390.776070047337
+                    }
+                },
+                "IDA1": {
+                    "cvar": 659.8085325498183,
+                    "volume_traded": 203.07415729649216,
+                    "net_volume_traded": 58.1938363783633,
+                    "profit": -5004.115803140963,
+                    "forecasted_profit": -5126.616250828865,
+                    "SMAPE": 7.83,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 659.1776043051354,
+                        "IDA2_max_profit": 3813.7822767077323,
+                        "IDA2_min_profit": 768.3488719733589
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 74.96325501199146,
+                    "net_volume_traded": 3.3133879924220215,
+                    "profit": 278.8112661468149,
+                    "forecasted_profit": 472.7297378127633,
+                    "SMAPE": 6.89
+                }
+            }
+        },
+        "2023-12-15": {
+            "profit": 2468.899999999996,
+            "auctions": {
+                "DA": {
+                    "cvar": 3822.3326963272016,
+                    "volume_traded": 240.0,
+                    "net_volume_traded": -160.0,
+                    "profit": 16389.199999999997,
+                    "forecasted_profit": 28478.452377319336,
+                    "SMAPE": 55.04,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1631.8808447075544,
+                        "IDA1_max_profit": -18078.891723632812,
+                        "IDA1_min_profit": -26483.331909179688
+                    }
+                },
+                "IDA1": {
+                    "cvar": 2053.667709060673,
+                    "volume_traded": 200.0,
+                    "net_volume_traded": 100.0,
+                    "profit": -8997.7,
+                    "forecasted_profit": -11677.868309020996,
+                    "SMAPE": 34.86,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 1164.4010249964401,
+                        "IDA2_max_profit": -2410.0668502807607,
+                        "IDA2_min_profit": -7820.187672424316
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 90.0,
+                    "net_volume_traded": 60.0,
+                    "profit": -4922.6,
+                    "forecasted_profit": -6324.345626831055,
+                    "SMAPE": 31.31
+                }
+            }
+        },
+        "2023-12-16": {
+            "profit": 2157.9935591825147,
+            "auctions": {
+                "DA": {
+                    "cvar": 2071.2437056405056,
+                    "volume_traded": 217.0193420870415,
+                    "net_volume_traded": -93.92591626238328,
+                    "profit": 7648.762918776643,
+                    "forecasted_profit": 9488.000859364904,
+                    "SMAPE": 22.68,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1377.1269945638542,
+                        "IDA1_max_profit": -384.9142148665703,
+                        "IDA1_min_profit": -6286.186609734552
+                    }
+                },
+                "IDA1": {
+                    "cvar": 763.5788732526617,
+                    "volume_traded": 214.44344874402634,
+                    "net_volume_traded": 87.66755151779395,
+                    "profit": -5480.226831540611,
+                    "forecasted_profit": -5775.55979529771,
+                    "SMAPE": 12.56,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 802.0087730585867,
+                        "IDA2_max_profit": 4515.1748446243655,
+                        "IDA2_min_profit": 509.89869887048724
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 50.643104756109516,
+                    "net_volume_traded": 6.2583647445893344,
+                    "profit": -10.542528053517831,
+                    "forecasted_profit": 170.9639152039228,
+                    "SMAPE": 21.61
+                }
+            }
+        },
+        "2023-12-17": {
+            "profit": 2834.720360664698,
+            "auctions": {
+                "DA": {
+                    "cvar": 1964.4458353430887,
+                    "volume_traded": 226.30847983265215,
+                    "net_volume_traded": 89.61676365500337,
+                    "profit": -1921.7798070912088,
+                    "forecasted_profit": -1277.066472622063,
+                    "SMAPE": 95.57,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1185.1313340748402,
+                        "IDA1_max_profit": 9778.335701131347,
+                        "IDA1_min_profit": 4265.14219738328
+                    }
+                },
+                "IDA1": {
+                    "cvar": 1266.1250948107404,
+                    "volume_traded": 211.42569508549337,
+                    "net_volume_traded": -111.42569508549337,
+                    "profit": 6017.324959613639,
+                    "forecasted_profit": 6514.165882153283,
+                    "SMAPE": 60.07,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 682.057714343156,
+                        "IDA2_max_profit": 1885.9822548937057,
+                        "IDA2_min_profit": -1327.1857726182159
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 56.0711749461732,
+                    "net_volume_traded": 21.808931430489995,
+                    "profit": -1260.8247918577324,
+                    "forecasted_profit": -959.1101075388336,
+                    "SMAPE": 44.42
+                }
+            }
+        },
+        "2023-12-18": {
+            "profit": 3215.0588666162603,
+            "auctions": {
+                "DA": {
+                    "cvar": 1238.7258806998648,
+                    "volume_traded": 209.3856190373171,
+                    "net_volume_traded": 9.057055386846741,
+                    "profit": 1789.9903867187654,
+                    "forecasted_profit": 1713.9716949944504,
+                    "SMAPE": 24.03,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 875.9827128888414,
+                        "IDA1_max_profit": 5568.636335341038,
+                        "IDA1_min_profit": 1589.5146913845615
+                    }
+                },
+                "IDA1": {
+                    "cvar": 3667.777131217166,
+                    "volume_traded": 228.921665568915,
+                    "net_volume_traded": 73.67146587770499,
+                    "profit": -8756.828210588847,
+                    "forecasted_profit": -9158.592680545902,
+                    "SMAPE": 15.73,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 1844.5659232473995,
+                        "IDA2_max_profit": 18510.3198895056,
+                        "IDA2_min_profit": 10647.121965238466
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 92.72852126455173,
+                    "net_volume_traded": -82.72852126455173,
+                    "profit": 10181.896690486341,
+                    "forecasted_profit": 14841.459254706457,
+                    "SMAPE": 43.18
+                }
+            }
+        },
+        "2023-12-19": {
+            "profit": 1417.4648083562724,
+            "auctions": {
+                "DA": {
+                    "cvar": 1436.5769122615336,
+                    "volume_traded": 234.82043485539583,
+                    "net_volume_traded": -30.348109403891137,
+                    "profit": 3621.6480855806785,
+                    "forecasted_profit": 6271.662093397239,
+                    "SMAPE": 58.99,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 757.9135915863267,
+                        "IDA1_max_profit": 254.86236400187363,
+                        "IDA1_min_profit": -3832.9513936932344
+                    }
+                },
+                "IDA1": {
+                    "cvar": 3907.3358365325844,
+                    "volume_traded": 199.65189059610887,
+                    "net_volume_traded": -69.65189059610887,
+                    "profit": 5854.116722775594,
+                    "forecasted_profit": 10672.624396293435,
+                    "SMAPE": 41.12,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 1782.4794606781622,
+                        "IDA2_max_profit": -4604.515649414062,
+                        "IDA2_min_profit": -12955.339894104003
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 110.0,
+                    "net_volume_traded": 100.0,
+                    "profit": -8058.3,
+                    "forecasted_profit": -9365.902671813965,
+                    "SMAPE": 17.89
+                }
+            }
+        },
+        "2023-12-20": {
+            "profit": 2184.433750141051,
+            "auctions": {
+                "DA": {
+                    "cvar": 2569.172959392919,
+                    "volume_traded": 235.09534511551539,
+                    "net_volume_traded": -104.9046548844846,
+                    "profit": 9339.088762870884,
+                    "forecasted_profit": 6653.533130949549,
+                    "SMAPE": 42.22,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1518.8868774176926,
+                        "IDA1_max_profit": 3412.6692423113427,
+                        "IDA1_min_profit": -3946.7707127225826
+                    }
+                },
+                "IDA1": {
+                    "cvar": 815.4850795427119,
+                    "volume_traded": 222.91660520803896,
+                    "net_volume_traded": 94.17886044360878,
+                    "profit": -6963.121523159025,
+                    "forecasted_profit": -3479.5051684118735,
+                    "SMAPE": 58.99,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 736.0056795874982,
+                        "IDA2_max_profit": 4063.7928195298427,
+                        "IDA2_min_profit": 212.0424566775123
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 52.17873990747644,
+                    "net_volume_traded": 10.72579444087581,
+                    "profit": -191.53348957080811,
+                    "forecasted_profit": -48.4399034425964,
+                    "SMAPE": 28.64
+                }
+            }
+        },
+        "2023-12-21": {
+            "profit": 3679.4272582421836,
+            "auctions": {
+                "DA": {
+                    "cvar": 2530.5250989641277,
+                    "volume_traded": 233.23685103256653,
+                    "net_volume_traded": -115.92578357839015,
+                    "profit": 7150.930060778142,
+                    "forecasted_profit": 1880.2303377906314,
+                    "SMAPE": 133.67,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1374.476417145735,
+                        "IDA1_max_profit": 7833.407383331013,
+                        "IDA1_min_profit": 487.08193607165924
+                    }
+                },
+                "IDA1": {
+                    "cvar": 746.588744741826,
+                    "volume_traded": 216.33623934412142,
+                    "net_volume_traded": 140.47785777120842,
+                    "profit": -3659.4747493152117,
+                    "forecasted_profit": 1205.1732363854746,
+                    "SMAPE": 123.55,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 590.9702593024617,
+                        "IDA2_max_profit": 3296.010970578426,
+                        "IDA2_min_profit": 559.0556499901995
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 64.45036026393973,
+                    "net_volume_traded": -4.552074192818251,
+                    "profit": 187.97194677925296,
+                    "forecasted_profit": 458.1315365513059,
+                    "SMAPE": 53.38
+                }
+            }
+        },
+        "2023-12-22": {
+            "profit": 3321.403082966367,
+            "auctions": {
+                "DA": {
+                    "cvar": 1572.6067005462908,
+                    "volume_traded": 233.58437901520625,
+                    "net_volume_traded": -46.80860857989481,
+                    "profit": 3759.253154618623,
+                    "forecasted_profit": 2481.042231165439,
+                    "SMAPE": 85.03,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 924.5928915559042,
+                        "IDA1_max_profit": 5298.397572587441,
+                        "IDA1_min_profit": 1104.5057428732046
+                    }
+                },
+                "IDA1": {
+                    "cvar": 705.9797640649779,
+                    "volume_traded": 178.87673312803693,
+                    "net_volume_traded": 45.95939829968643,
+                    "profit": -760.3971613627801,
+                    "forecasted_profit": 88.31623655183898,
+                    "SMAPE": 87.25,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 637.000473873966,
+                        "IDA2_max_profit": 2851.9867463625083,
+                        "IDA2_min_profit": 564.199507136875
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 69.15821635668769,
+                    "net_volume_traded": 0.849210280208375,
+                    "profit": 322.5470897105241,
+                    "forecasted_profit": 144.76956827317838,
+                    "SMAPE": 52.91
+                }
+            }
+        },
+        "2023-12-23": {
+            "profit": 2493.3492999309,
+            "auctions": {
+                "DA": {
+                    "cvar": 1230.3683534700785,
+                    "volume_traded": 218.7503547518382,
+                    "net_volume_traded": 59.26571630491685,
+                    "profit": 1189.0618864940968,
+                    "forecasted_profit": 2680.729042232051,
+                    "SMAPE": 89.77,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 845.2394402173948,
+                        "IDA1_max_profit": 5408.529517492831,
+                        "IDA1_min_profit": 1228.1481629834584
+                    }
+                },
+                "IDA1": {
+                    "cvar": 768.6718235874988,
+                    "volume_traded": 203.01442180265346,
+                    "net_volume_traded": -37.784331343340995,
+                    "profit": 755.4483113905189,
+                    "forecasted_profit": 258.77281131403157,
+                    "SMAPE": 88.95,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 611.5351534165278,
+                        "IDA2_max_profit": 4054.3130013698174,
+                        "IDA2_min_profit": 854.9554673110262
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 71.705947175786,
+                    "net_volume_traded": -11.481384961575845,
+                    "profit": 548.8391020462841,
+                    "forecasted_profit": 731.1894214604165,
+                    "SMAPE": 45.64
+                }
+            }
+        },
+        "2023-12-24": {
+            "profit": 1494.8434426875647,
+            "auctions": {
+                "DA": {
+                    "cvar": 1306.2013311613252,
+                    "volume_traded": 223.27880028206872,
+                    "net_volume_traded": 26.74970814915943,
+                    "profit": 1259.3555639206165,
+                    "forecasted_profit": 2770.5065945518318,
+                    "SMAPE": 98.25,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 835.4186004053579,
+                        "IDA1_max_profit": 4547.396796430468,
+                        "IDA1_min_profit": 495.4143811185959
+                    }
+                },
+                "IDA1": {
+                    "cvar": 1063.926961562794,
+                    "volume_traded": 191.36665576014008,
+                    "net_volume_traded": -39.03568024323116,
+                    "profit": 470.70005928070486,
+                    "forecasted_profit": 922.6816475872834,
+                    "SMAPE": 108.63,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 775.928997592069,
+                        "IDA2_max_profit": 3604.3022668052663,
+                        "IDA2_min_profit": -172.5879248879163
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 101.292590723181,
+                    "net_volume_traded": 12.285972094071722,
+                    "profit": -235.21218051375672,
+                    "forecasted_profit": -75.88960225322766,
+                    "SMAPE": 87.95
+                }
+            }
+        },
+        "2023-12-25": {
+            "profit": 563.5005888720726,
+            "auctions": {
+                "DA": {
+                    "cvar": 3755.9219668690776,
+                    "volume_traded": 226.3146839943741,
+                    "net_volume_traded": -151.22843866854197,
+                    "profit": 5471.100446629387,
+                    "forecasted_profit": 6684.648005445126,
+                    "SMAPE": 69.65,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1827.2328402616308,
+                        "IDA1_max_profit": 4964.810987209711,
+                        "IDA1_min_profit": -3841.8996780914613
+                    }
+                },
+                "IDA1": {
+                    "cvar": 897.3240000939185,
+                    "volume_traded": 213.780200561923,
+                    "net_volume_traded": 172.4161175726241,
+                    "profit": -5663.501183517925,
+                    "forecasted_profit": -2531.7524388523207,
+                    "SMAPE": 111.71,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 542.399820937717,
+                        "IDA2_max_profit": 4119.0179431073275,
+                        "IDA2_min_profit": 884.9367239142194
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 87.5344834324511,
+                    "net_volume_traded": -16.18767890408212,
+                    "profit": 755.9013257606103,
+                    "forecasted_profit": 1154.1991658301904,
+                    "SMAPE": 83.23
+                }
+            }
+        },
+        "2023-12-26": {
+            "profit": 1784.5261577635483,
+            "auctions": {
+                "DA": {
+                    "cvar": 1239.0345102718727,
+                    "volume_traded": 225.19897553377587,
+                    "net_volume_traded": -0.10024033896870499,
+                    "profit": 1479.823264067129,
+                    "forecasted_profit": 2654.9230515728423,
+                    "SMAPE": 96.93,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 746.1129924443173,
+                        "IDA1_max_profit": 4030.6329374246075,
+                        "IDA1_min_profit": 201.43884183704063
+                    }
+                },
+                "IDA1": {
+                    "cvar": 2336.155402615956,
+                    "volume_traded": 194.0917974550937,
+                    "net_volume_traded": -60.42472613565775,
+                    "profit": 7171.13902015321,
+                    "forecasted_profit": 4806.114795541362,
+                    "SMAPE": 60.65,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 1155.1396597626995,
+                        "IDA2_max_profit": 810.5708923984048,
+                        "IDA2_min_profit": -4993.239556503804
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 90.52496647462645,
+                    "net_volume_traded": 60.52496647462645,
+                    "profit": -6866.436126456791,
+                    "forecasted_profit": -3546.757069036421,
+                    "SMAPE": 75.53
+                }
+            }
+        },
+        "2023-12-27": {
+            "profit": 2270.2996712385248,
+            "auctions": {
+                "DA": {
+                    "cvar": 1982.738679642639,
+                    "volume_traded": 238.48602029965755,
+                    "net_volume_traded": 91.51397970034247,
+                    "profit": -541.166066455268,
+                    "forecasted_profit": 348.3364945597905,
+                    "SMAPE": 81.43,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 1034.5496558974392,
+                        "IDA1_max_profit": 8028.55522608976,
+                        "IDA1_min_profit": 3048.015400168438
+                    }
+                },
+                "IDA1": {
+                    "cvar": 1312.4375806965606,
+                    "volume_traded": 178.78762469655868,
+                    "net_volume_traded": -111.21237530344133,
+                    "profit": 4037.1998668163624,
+                    "forecasted_profit": 5948.5938918231095,
+                    "SMAPE": 71.6,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 744.8150538133035,
+                        "IDA2_max_profit": 1784.612437721969,
+                        "IDA2_min_profit": -1885.393246661868
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 85.30160439690114,
+                    "net_volume_traded": 24.698395603098863,
+                    "profit": -1225.7341291225694,
+                    "forecasted_profit": -1126.361065540971,
+                    "SMAPE": 29.39
+                }
+            }
+        },
+        "2023-12-28": {
+            "profit": 2294.946354841344,
+            "auctions": {
+                "DA": {
+                    "cvar": 1149.2775044784858,
+                    "volume_traded": 225.7345839482334,
+                    "net_volume_traded": 5.734583948233441,
+                    "profit": 2633.4686541395677,
+                    "forecasted_profit": 2668.8994337077343,
+                    "SMAPE": 102.08,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 747.8431359567016,
+                        "IDA1_max_profit": 4397.10600188034,
+                        "IDA1_min_profit": 663.8903787847665
+                    }
+                },
+                "IDA1": {
+                    "cvar": 1277.2444546273343,
+                    "volume_traded": 186.6372326295879,
+                    "net_volume_traded": -29.17122803515042,
+                    "profit": 601.4498735108648,
+                    "forecasted_profit": 1162.265637224421,
+                    "SMAPE": 100.29,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 796.7597064555324,
+                        "IDA2_max_profit": 2606.1409242777436,
+                        "IDA2_min_profit": -1574.1249390992466
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 83.43664408691698,
+                    "net_volume_traded": 23.43664408691698,
+                    "profit": -939.9721728090881,
+                    "forecasted_profit": -819.297215798242,
+                    "SMAPE": 48.92
+                }
+            }
+        },
+        "2023-12-29": {
+            "profit": 2040.7590562398586,
+            "auctions": {
+                "DA": {
+                    "cvar": 1273.7961777079531,
+                    "volume_traded": 225.46359264486495,
+                    "net_volume_traded": 31.982580636061517,
+                    "profit": 433.1135717165175,
+                    "forecasted_profit": 2558.6422270147827,
+                    "SMAPE": 120.27,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 865.0726149307181,
+                        "IDA1_max_profit": 5005.214457939885,
+                        "IDA1_min_profit": 782.1724611198526
+                    }
+                },
+                "IDA1": {
+                    "cvar": 564.6476482053966,
+                    "volume_traded": 193.5042528329017,
+                    "net_volume_traded": -37.04702833348719,
+                    "profit": 2657.9712190645782,
+                    "forecasted_profit": 806.3365391019079,
+                    "SMAPE": 71.28,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 391.71787907961743,
+                        "IDA2_max_profit": 2089.7534855555186,
+                        "IDA2_min_profit": 308.426718322198
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 85.53893984635963,
+                    "net_volume_traded": 5.0644476974256625,
+                    "profit": -1050.3257345412371,
+                    "forecasted_profit": 147.9280347215644,
+                    "SMAPE": 37.96
+                }
+            }
+        },
+        "2023-12-30": {
+            "profit": -685.7447124812437,
+            "auctions": {
+                "DA": {
+                    "cvar": 5031.002734231057,
+                    "volume_traded": 240.0,
+                    "net_volume_traded": -220.0,
+                    "profit": 17142.8,
+                    "forecasted_profit": 57617.10639953613,
+                    "SMAPE": 107.55,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 2369.1598905270994,
+                        "IDA1_max_profit": -35679.427353322506,
+                        "IDA1_min_profit": -46408.90715789795
+                    }
+                },
+                "IDA1": {
+                    "cvar": 647.482595223258,
+                    "volume_traded": 212.39655056701397,
+                    "net_volume_traded": 212.39655056701397,
+                    "profit": -18393.806772849297,
+                    "forecasted_profit": -32737.669706907604,
+                    "SMAPE": 61.47,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 600.0426183789851,
+                        "IDA2_max_profit": 3333.8479455619145,
+                        "IDA2_min_profit": 417.04401469337006
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 67.60344943298604,
+                    "net_volume_traded": 7.603449432986036,
+                    "profit": 565.262060368054,
+                    "forecasted_profit": 377.7902666355112,
+                    "SMAPE": 94.85
+                }
+            }
+        },
+        "2023-12-31": {
+            "profit": 2474.6605911149563,
+            "auctions": {
+                "DA": {
+                    "cvar": 1312.287221322752,
+                    "volume_traded": 228.74811398688598,
+                    "net_volume_traded": 12.614842589487175,
+                    "profit": 1848.079591882745,
+                    "forecasted_profit": 2394.431462686012,
+                    "SMAPE": 85.25,
+                    "scenario_stats": {
+                        "IDA1_profit_std": 853.13238094644,
+                        "IDA1_max_profit": 4931.675435396547,
+                        "IDA1_min_profit": 792.3765596065131
+                    }
+                },
+                "IDA1": {
+                    "cvar": 915.2976853820317,
+                    "volume_traded": 184.2633940420705,
+                    "net_volume_traded": -20.200022781924893,
+                    "profit": 869.6770816426159,
+                    "forecasted_profit": 848.8402513887813,
+                    "SMAPE": 34.17,
+                    "scenario_stats": {
+                        "IDA2_profit_std": 924.2678946619926,
+                        "IDA2_max_profit": 5018.78096054191,
+                        "IDA2_min_profit": 117.48689014035244
+                    }
+                },
+                "IDA2": {
+                    "volume_traded": 76.45493251602792,
+                    "net_volume_traded": 7.585180192437721,
+                    "profit": -243.09608241040453,
+                    "forecasted_profit": -175.90048639773778,
+                    "SMAPE": 8.16
                 }
             }
         }

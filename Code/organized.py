@@ -30,28 +30,30 @@ dark_style = {
 }
 plt.rcParams.update(dark_style)
 plt.rcParams['figure.figsize'] = (15, 10)
+pd.options.display.float_format = '{:.2f}'.format
 
 HORIZON = 48
 
 POWER = 10  # MW
-CAPACITY = 40  # MWh
+CAPACITY = 20  # MWh
 MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
 NUM_SCENARIOS = 100
-RISK_AVERSE_FACTOR = 0
+RISK_AVERSE_FACTOR = 1
 BETA = 0.95
 
 SHOW_FINAL_SCHEDULE = False
 PLOT_CVARS = False
 SHOW_SCENARIOS = False
 # PLOT_SCENARIO_SCHEDULES = False
+PLOT_FORECASTS = True
 
 
 def main():
     ems = EMS(Data())
     max_days = ems.data.testing_data['DA'].shape[0] // 48
-    results = ems.run(5)
+    results = ems.run(max_days)
 
     results_dir = 'results'
     os.makedirs(results_dir, exist_ok=True)
@@ -145,16 +147,16 @@ class Data:
         for auction_name in self.cross_vals.keys():
             print(f"Updating cross-validation for {auction_name}")
             cross_val = self.cross_vals[auction_name]
-            auction_prices = self.get_actual_prices(auction_name)
-            forecasted = self.get_forecast_from_file(auction_name)
+            y = self.get_actual_prices(auction_name)
+            mstl = self.get_forecast_from_file(auction_name)
             trading_hours = cross_val['ds'].dt.hour.unique()
             timeframe_mask = self.prediction_day['ds'].dt.floor(
                 'h').dt.hour.isin(trading_hours)
             df = pd.DataFrame({
                 'ds': self.prediction_day['ds'].loc[timeframe_mask],
-                'y': auction_prices,
-                'MSTL': forecasted,
-                'error': auction_prices - forecasted
+                'y': y,
+                'MSTL': mstl,
+                'error': y - mstl
             })
             print("Old mean/std:",
                   cross_val['error'].mean(), cross_val['error'].std(), len(cross_val))
@@ -217,6 +219,18 @@ class EMS:
         try:
             forecast = self.data.get_forecast_from_file(auction_name)
             print("SMAPE:", self.data.calculate_smape(auction_name, forecast))
+            if PLOT_FORECASTS:
+                date_mask = self.data.testing_data[auction_name]['ds'].dt.date == self.data.date
+                real_prices = self.data.testing_data[auction_name].loc[date_mask, [
+                    'y', 'ds']].dropna()
+                timeframe_mask = self.data.prediction_day['ds'].dt.floor(
+                    'h').dt.hour.isin(real_prices['ds'].dt.hour.unique())
+                plt.plot(real_prices['ds'],
+                         real_prices['y'], label='Real Prices')
+                plt.plot(
+                    self.data.prediction_day['ds'].loc[timeframe_mask], forecast, label='Forecast')
+                plt.legend()
+                plt.show()
             return forecast
         except:
             train = self.data.training_data[auction_name]
