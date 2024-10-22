@@ -43,27 +43,32 @@ EFFICIENCY = 1
 
 RISK_AVERSE_FACTOR = 1
 BETA = 0.99
-
 NUM_SCENARIOS = 0
 
 SHOW_FINAL_SCHEDULE = False
 PLOT_CVARS = False
 SHOW_SCENARIOS = False
 
-WITH_CVAR = False
-
 
 def main():
     ems = EMS(Data())
     max_days = ems.data.testing_data['DA'].shape[0] // 48
-    model_type = 'deterministic' if NUM_SCENARIOS == 0 else 'stochastic'
 
-    results = ems.run(max_days, model_type)
+    results = ems.run(max_days)
+    results['Params'] = {
+        'POWER': POWER,
+        'CAPACITY': CAPACITY,
+        'MAX_TRADE': MAX_TRADE,
+        'EFFICIENCY': EFFICIENCY,
+        'RISK_AVERSE_FACTOR': RISK_AVERSE_FACTOR,
+        'BETA': BETA,
+        'NUM_SCENARIOS': NUM_SCENARIOS,
+    }
     print(f"Overall profit: {results['overall_profit']}")
 
-    model_type = 'stochastic' if WITH_CVAR else 'stochastic_no_cvar'
     results_dir = 'results'
     os.makedirs(results_dir, exist_ok=True)
+    model_type = 'deterministic' if NUM_SCENARIOS == 0 else 'stochastic'
     subfolder_name = f'{model_type}/battery_{POWER}MW_{CAPACITY}MWh'
     subfolder_path = os.path.join(results_dir, subfolder_name)
     if not os.path.exists(subfolder_path):
@@ -376,11 +381,11 @@ class EMS:
         return res
 
     def __get_trading_window(self, auction_name):
-        start_time_y = self.data.training_data[auction_name].dropna()[
+        start_time = self.data.training_data[auction_name].dropna()[
             'ds'].dt.hour.min() * 2
-        end_time_y = (self.data.training_data[auction_name].dropna()[
+        end_time = (self.data.training_data[auction_name].dropna()[
             'ds'].dt.hour.max() + 1) * 2
-        return start_time_y, end_time_y
+        return start_time, end_time
 
     def __calculate_profit(self, schedules):
         profit = 0
@@ -449,62 +454,6 @@ class EMS:
         plt.axvline(x=0, color='w', linestyle='-', alpha=0.2, zorder=1)
         plt.legend()
         plt.show()
-
-    def __solve_without_cvar(self, x_forecast, y_scenarios,
-                             start_time_y, end_time_y, prev_bids):
-        model = gp.Model("Master Combined")
-        model.setParam('OutputFlag', 0)  # Turn off Gurobi output
-
-        x = model.addVars(HORIZON, lb=-MAX_TRADE,
-                          ub=MAX_TRADE, name="bids")
-        y = model.addVars(HORIZON, NUM_SCENARIOS, lb=-MAX_TRADE, ub=MAX_TRADE,
-                          name="adjustments")
-        soc = model.addVars(HORIZON+1, NUM_SCENARIOS,
-                            lb=0, ub=CAPACITY, name="soc")
-
-        for s in range(NUM_SCENARIOS):
-            model.addConstr(soc[0, s] == 0, name=f"initial_soc_s{s}")
-
-        for t in range(HORIZON):
-            for s in range(NUM_SCENARIOS):
-                if t < start_time_y or t > end_time_y:
-                    model.addConstr(y[t, s] == 0)
-
-                model.addConstr(
-                    soc[t+1, s] == soc[t, s] + x[t] + y[t, s] + prev_bids[t],
-                    name=f"soc_balance_t{t}_s{s}"
-                )
-                model.addConstr(
-                    x[t] + y[t, s] + prev_bids[t] <= POWER,
-                    name=f"physical_charge_limit_t{t}_s{s}"
-                )
-                model.addConstr(
-                    x[t] + y[t, s] + prev_bids[t] >= -POWER,
-                    name=f"physical_discharge_limit_t{t}_s{s}"
-                )
-
-        scenario_profit = {s: gp.quicksum(
-            -y_scenarios[s][t - start_time_y] * y[t, s] for t in range(start_time_y, end_time_y)) for s in range(NUM_SCENARIOS)}
-        expected_scenario_profit = (
-            1/NUM_SCENARIOS)*gp.quicksum(scenario_profit[s] for s in range(NUM_SCENARIOS))
-
-        expected_profit = gp.quicksum(
-            (-x_forecast[t] * x[t]) for t in range(HORIZON)) + expected_scenario_profit
-        model.setObjective(expected_profit, GRB.MAXIMIZE)
-        model.optimize()
-
-        if model.status == GRB.OPTIMAL:
-            return (
-                [x[t].x for t in range(HORIZON)],
-                [[y[t, s].x for t in range(start_time_y, end_time_y)]
-                 for s in range(NUM_SCENARIOS)],
-                [[soc[t+1, s].x for t in range(HORIZON)]
-                 for s in range(NUM_SCENARIOS)],
-                np.nan,
-                expected_scenario_profit.getValue()
-            )
-        else:
-            raise Exception("Master is infeasible")
 
     def __solve_two_stage(self, x_forecast, y_scenarios,
                           start_time_y, end_time_y, prev_bids,
@@ -580,70 +529,6 @@ class EMS:
         else:
             raise Exception("Master is infeasible")
 
-    # def __solve_single(self, x_forecasted, start_soc, prev_bids):
-    #     model = gp.Model("Master Combined")
-    #     model.setParam('OutputFlag', 0)  # Turn off Gurobi output
-
-    #     horizon = len(x_forecasted)
-    #     print("Trading period length:", horizon)
-
-    #     x = model.addVars(horizon, lb=-MAX_TRADE,
-    #                       ub=MAX_TRADE, vtype=GRB.CONTINUOUS, name="da_schedule")
-    #     soc = model.addVars(horizon+1, lb=0, ub=CAPACITY,
-    #                         vtype=GRB.CONTINUOUS, name="soc")
-
-    #     model.addConstr(soc[0] == start_soc, name=f"initial_soc")
-
-    #     for t in range(horizon):
-    #         model.addConstr(
-    #             soc[t+1] == soc[t] + x[t] + prev_bids[t],
-    #             name=f"soc_balance_t{t}"
-    #         )
-    #         model.addConstr(
-    #             soc[t+1] <= soc[t] + POWER,
-    #             name=f"physical_charge_limit_t{t}"
-    #         )
-    #         model.addConstr(
-    #             soc[t+1] >= soc[t] - POWER,
-    #             name=f"physical_discharge_limit_t{t}"
-    #         )
-
-    #     profits = model.addVars(horizon, name="profits")
-    #     model.addConstrs((profits[t] == -x_forecasted[t] * x[t])
-    #                      for t in range(horizon))
-
-    #     model.setObjective(
-    #         gp.quicksum(profits[t] for t in range(horizon)),
-    #         GRB.MAXIMIZE)
-    #     model.optimize()
-
-    #     if model.status == GRB.OPTIMAL:
-    #         # schedule = [x[t].x for t in range(
-    #         #     start_time_x, end_time_x)]
-    #         # prices = [x_forecasted[t - start_time_x]
-    #         #           for t in range(start_time_x, end_time_x)]
-    #         # profits = [-price*bid for price,
-    #         #            bid in zip(prices, schedule)]
-    #         print("Profits:", [profits[t].x for t in range(horizon)])
-    #         schedule = [x[t].x for t in range(horizon)]
-    #         prices = [x_forecasted[t] for t in range(horizon)]
-    #         profits = [-price*bid for price,
-    #                    bid in zip(prices, schedule)]
-    #         if sum(profits) != model.objVal:
-    #             print("Model's objective value:", model.objVal)
-    #             print("Actual Profit:", sum(profits))
-    #             raise Exception("Objective value does not match actual profit")
-    #         return (
-    #             [x[t].x for t in range(horizon)],
-    #             [soc[t+1].x for t in range(horizon)]
-    #         )
-    #     else:
-    #         print('forecast:', x_forecasted)
-    #         print('prev_bids:', prev_bids)
-    #         # print('start_time_x:', start_time_x)
-    #         # print('end_time_x:', end_time_x)
-    #         raise Exception("Master is infeasible")
-
     def __solve_single(self, x_forecasted, prev_bids, start_time_x, end_time_x):
         model = gp.Model("Master Combined")
         model.setParam('OutputFlag', 0)  # Turn off Gurobi output
@@ -659,7 +544,7 @@ class EMS:
         model.addConstr(soc[0] == 0, name=f"initial_soc")
 
         for t in range(HORIZON):
-            if t < start_time_x or t > end_time_x:
+            if t < start_time_x or t >= end_time_x:
                 model.addConstr(x[t] == 0)
 
             model.addConstr(
@@ -682,17 +567,27 @@ class EMS:
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
-            if sum([x[t].x for t in range(HORIZON)]) > 0:
-                print("Net Volume Traded:", sum(
-                    [x[t].x for t in range(HORIZON)]))
-                schedule = [x[t].x for t in range(
-                    start_time_x, end_time_x)]
-                prices = [x_forecasted[t - start_time_x]
-                          for t in range(start_time_x, end_time_x)]
-                profits = [-price*bid for price,
-                           bid in zip(prices, schedule)]
+            schedule = [x[t].x for t in range(
+                start_time_x, end_time_x)]
+            prices = [x_forecasted[t - start_time_x]
+                      for t in range(start_time_x, end_time_x)]
+            profits = [-price*bid for price,
+                       bid in zip(prices, schedule)]
+            if sum(profits) != model.objVal:
                 print("Model's objective value:", model.objVal)
                 print("Actual Profit:", sum(profits))
+                raise Exception("Objective value does not match actual profit")
+            if sum(schedule) > 0 and all([price > 0 for price in prices]):
+                print("schedule =", schedule)
+                print("prices =", prices)
+                self.__show_schedule(
+                    {'first-stage': schedule}, [prices], [soc[t+1].x for t in range(HORIZON)])
+                raise Exception("Net volume left")
+            if sum([x[t].x for t in range(HORIZON)]) > 0 and sum(schedule) == 0:
+                print("somethings not right")
+                print("schedule =", schedule)
+                print("bids =", [x[t].x for t in range(HORIZON)])
+                raise Exception("Schedules don't match")
             return (
                 [x[t].x for t in range(HORIZON)],
                 [soc[t+1].x for t in range(HORIZON)]
@@ -727,9 +622,7 @@ class EMS:
                 self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
                                   end_time_y, prev_bids)
 
-            # bids, ys, _, cvar, _ = self.__solve_two_stage(
-            #     first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, prev_bids)
-            bids, ys, _, cvar, _ = self.__solve_without_cvar(
+            bids, ys, _, cvar, _ = self.__solve_two_stage(
                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, prev_bids)
             schedules[first_stage] = bids
             prev_bids = np.add(prev_bids, bids)
@@ -801,14 +694,10 @@ class EMS:
             self.data.realize_prices(first_stage)
             print(
                 f"Actual Profit {first_stage}: {np.dot(-self.data.prediction_day[f'y_{first_stage}'].dropna(),bids[start_time:end_time])}")
-            if sum(bids) > 0:
-                print("Net Volume:", sum(bids))
-                realized_prices = [
-                    self.data.prediction_day[f'y_{auction}'] for auction in schedule.keys()]
-                self.__show_schedule(schedule, realized_prices, soc)
 
             actual = self.data.get_actual_prices(first_stage)
             stats[first_stage] = {
+                'bids': bids,
                 'volume_traded': sum([abs(bid) for bid in bids]),
                 'net_volume_traded': sum(bids),
                 'profit': np.dot(-np.array(actual), bids[start_time:end_time]),
@@ -825,13 +714,13 @@ class EMS:
         total_profit = self.__calculate_profit(schedule)
         return stats, total_profit
 
-    def run(self, num_days, model_type):
+    def run(self, num_days):
         results = {}
         for _ in range(num_days):
             print(f'\nRunning day {self.data.date}')
             print("=====================================\n")
             stages, profit = None, None
-            if model_type == 'stochastic':
+            if NUM_SCENARIOS > 0:
                 stages, profit = self.__run_stochastic()
             else:
                 stages, profit = self.__run_deterministic()
