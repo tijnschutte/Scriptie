@@ -1,6 +1,4 @@
 {
-    "risk_averse_factor": 1,
-    "overall_profit": 67660.00000000001,
     "results": {
         "2023-12-01": {
             "profit": 4543.599999999999,
@@ -5459,13 +5457,14 @@
             }
         }
     },
-    "Params": {
+    "params": {
         "POWER": 10,
         "CAPACITY": 20,
         "MAX_TRADE": 5.0,
         "EFFICIENCY": 1,
-        "RISK_AVERSE_FACTOR": 1,
+        "RISK_AVERSE_FACTOR": 0.5,
         "BETA": 0.99,
-        "NUM_SCENARIOS": 0
+        "NUM_SCENARIOS": 0,
+        "SCENARIO_TYPE": "block"
     }
 }
