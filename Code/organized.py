@@ -41,11 +41,12 @@ CAPACITY = 20  # MWh
 MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
-RISK_AVERSE_FACTOR = 1
+RISK_AVERSE_FACTOR = 0.5
 BETA = 0.99
-NUM_SCENARIOS = 0
+NUM_SCENARIOS = 100
+SCENARIO_TYPE = 'block'
 
-SHOW_FINAL_SCHEDULE = False
+SHOW_FINAL_SCHEDULE = True
 PLOT_CVARS = False
 SHOW_SCENARIOS = False
 
@@ -64,7 +65,8 @@ def main():
         'BETA': BETA,
         'NUM_SCENARIOS': NUM_SCENARIOS,
     }
-    print(f"Overall profit: {results['overall_profit']}")
+    print(
+        f"Overall profit: {sum([day['profit'] for day in results.values()])}")
 
     results_dir = 'results'
     os.makedirs(results_dir, exist_ok=True)
@@ -485,11 +487,11 @@ class EMS:
                     name=f"soc_balance_t{t}_s{s}"
                 )
                 model.addConstr(
-                    x[t] + y[t, s] + prev_bids[t] <= POWER,
+                    soc[t+1, s] <= soc[t, s] + POWER,
                     name=f"physical_charge_limit_t{t}_s{s}"
                 )
                 model.addConstr(
-                    x[t] + y[t, s] + prev_bids[t] >= -POWER,
+                    soc[t+1, s] >= soc[t, s] - POWER,
                     name=f"physical_discharge_limit_t{t}_s{s}"
                 )
 
@@ -610,7 +612,8 @@ class EMS:
 
             first_stage_forecast = self.__forecast(first_stage)
             second_stage_scenarios = self.get_scenarios(
-                self.__forecast(second_stage), second_stage, 'block')
+                self.__forecast(second_stage), second_stage, SCENARIO_TYPE)
+            print("#scenarios:", len(second_stage_scenarios))
             start_time_y, end_time_y = self.__get_trading_window(second_stage)
 
             print("BEST SCENARIO SMAPE:", min([
@@ -732,11 +735,7 @@ class EMS:
             self.data.move_to_next_day()
             print("\n")
 
-        return {
-            'risk_averse_factor': RISK_AVERSE_FACTOR,
-            'overall_profit': sum([day['profit'] for day in results.values()]),
-            'results': results
-        }
+        return results
 
 
 if __name__ == '__main__':
