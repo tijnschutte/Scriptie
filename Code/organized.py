@@ -43,13 +43,13 @@ EFFICIENCY = 1
 
 # 'stochastic', 'robust' or 'deterministic'
 MODEL_TYPE = 'stochastic'
-RISK_AVERSE_FACTOR = 0
+RISK_AVERSE_FACTOR = 0.8
 BETA = 0.99
 NUM_SCENARIOS = 100
 SCENARIO_TYPE = 'block'
 
-SHOW_FINAL_SCHEDULE = True
-PLOT_CVARS = False
+SHOW_FINAL_SCHEDULE = False
+PLOT_CVARS = True
 SHOW_SCENARIOS = False
 
 
@@ -430,7 +430,7 @@ class EMS:
     def __plot_cvars(self, first_stage_forecast, second_stage_scenarios,
                      start_time_y, end_time_y, soc):
         res = {}
-        for l in np.linspace(0, 2, 21):
+        for l in np.linspace(0, 1, 11):
             bids, adjustments, _, cvar, e_scenarios_profit = self.__solve_two_stage(
                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, soc, risk_averse_factor=l)
 
@@ -440,15 +440,15 @@ class EMS:
             res[l] = {
                 "cvar": cvar,
                 "expected": e_scenarios_profit,
-                "std": np.std(scenario_profits),
+                "worst": min(scenario_profits),
             }
         risk_averse_factors = list(res.keys())
         cvars = [res[l]["cvar"] for l in risk_averse_factors]
         expected = [res[l]["expected"] for l in risk_averse_factors]
-        std = [res[l]["std"] for l in risk_averse_factors]
+        worst = [res[l]["worst"] for l in risk_averse_factors]
         plt.plot(risk_averse_factors, cvars, label="CVaR")
         plt.plot(risk_averse_factors, expected, label="Expected Profit")
-        plt.plot(risk_averse_factors, std, label="Profit Std")
+        plt.plot(risk_averse_factors, worst, label="Worst-Case Profit")
         plt.title(f"Battery: {POWER} MW, {CAPACITY} MWh")
         plt.xlabel("Risk Averse Factor")
         plt.ylabel("Value (eur)")
@@ -680,7 +680,7 @@ class EMS:
                 for second_stage_scenario in second_stage_scenarios
             ]))
 
-            if PLOT_CVARS and first_stage == "DA":
+            if PLOT_CVARS and first_stage == "DA" and self.data.date == '2023-12-30':
                 self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
                                   end_time_y, prev_bids)
 
