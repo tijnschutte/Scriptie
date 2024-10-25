@@ -42,9 +42,9 @@ MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
 # 'stochastic', 'robust' or 'deterministic'
-MODEL_TYPE = 'robust'
-RISK_AVERSE_FACTOR = 0
-BETA = 0.99
+MODEL_TYPE = 'stochastic'
+RISK_AVERSE_FACTOR = 1
+BETA = 0.95
 
 # 'block', 'standard', 'monte_carlo' or 'dexter'
 SCENARIO_TYPE = 'dexter'
@@ -597,7 +597,7 @@ class EMS:
 
         expected_profit = gp.quicksum(
             (-x_forecast[t] * x[t]) for t in range(HORIZON)) + expected_scenario_profit
-        model.setObjective((expected_profit) - (cvar *
+        model.setObjective(((1-risk_averse_factor)*expected_profit) - (cvar *
                            risk_averse_factor), GRB.MAXIMIZE)
         model.optimize()
 
@@ -704,7 +704,7 @@ class EMS:
                 for second_stage_scenario in second_stage_scenarios
             ]))
 
-            if PLOT_CVARS and first_stage == "DA" and self.data.date.day == 12:
+            if PLOT_CVARS and first_stage == "DA" and self.data.date.day == 1:
                 self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
                                   end_time_y, prev_bids)
 
