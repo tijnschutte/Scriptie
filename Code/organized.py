@@ -42,14 +42,16 @@ MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
 # 'stochastic', 'robust' or 'deterministic'
-MODEL_TYPE = 'stochastic'
-RISK_AVERSE_FACTOR = 0.8
+MODEL_TYPE = 'robust'
+RISK_AVERSE_FACTOR = 0
 BETA = 0.99
+
+# 'block', 'standard', 'monte_carlo' or 'dexter'
+SCENARIO_TYPE = 'dexter'
 NUM_SCENARIOS = 100
-SCENARIO_TYPE = 'block'
 
 SHOW_FINAL_SCHEDULE = False
-PLOT_CVARS = True
+PLOT_CVARS = False
 SHOW_SCENARIOS = False
 
 
@@ -179,11 +181,10 @@ class Data:
                 'MSTL': mstl,
                 'error': y - mstl
             })
-            # day_length = cross_val['ds'].dt.floor('d').value_counts().iloc[0]
             self.cross_vals[auction_name] = pd.concat(
                 [cross_val, df]).reset_index(drop=True)
-            print("Starting date updated from",
-                  cross_val['ds'].iloc[0].date(), "to", self.cross_vals[auction_name]['ds'].iloc[0].date())
+            print(
+                f"Forecasting errors taken from past {len(cross_val['ds'].dt.date.unique())} days")
             print("Mean error updated from", cross_val['error'].mean(
             ), "to", self.cross_vals[auction_name]['error'].mean())
             print("Std error updated from", cross_val['error'].std(
@@ -225,8 +226,10 @@ class Data:
         date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
         actual = self.testing_data[auction_name].loc[date_mask, 'y'].dropna(
         ).values
-        return round(smape(pd.DataFrame({'y': actual, 'y_hat': forecast, 'unique_id': 1}), [
-            'y_hat']).iloc[0, 1]*100, 2)
+        nmae = np.sum(np.abs(actual - forecast)) / np.sum(np.abs(actual))
+        # return round(smape(pd.DataFrame({'y': actual, 'y_hat': forecast, 'unique_id': 1}), [
+        # 'y_hat']).iloc[0, 1]*100, 2)
+        return nmae*100
 
 
 class EMS:
@@ -289,8 +292,27 @@ class EMS:
             return self.__get_standard_scenarios(forecast, auction_name)
         elif type == 'monte_carlo':
             return self.__get_monte_carlo_scenarios(forecast, auction_name)
+        elif type == 'dexter':
+            return self.__get_dexter_scenarios(forecast, auction_name)
         else:
             raise ValueError("Invalid scenario type")
+
+    def __get_dexter_scenarios(self, forecast, auction_name):
+        cross_val = self.data.cross_vals[auction_name].copy()
+        residuals = cross_val.groupby(
+            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error']
+
+        quantiles = np.linspace(0, 1, NUM_SCENARIOS)
+        scenarios = [forecast]
+        for quantile in quantiles:
+            errors = residuals.quantile(quantile).values
+            scenario = np.add(forecast, errors)
+            scenarios.append(scenario)
+
+        if SHOW_SCENARIOS:
+            self.data.plot_scenarios(scenarios, auction_name)
+
+        return scenarios
 
     def __get_block_scenarios(self, forecast, auction_name, block_size=8):
         cross_val = self.data.cross_vals[auction_name].copy()
@@ -439,7 +461,7 @@ class EMS:
 
             res[l] = {
                 "cvar": cvar,
-                "expected": e_scenarios_profit,
+                "expected": np.dot(-np.array(first_stage_forecast), bids) + e_scenarios_profit,
                 "worst": min(scenario_profits),
             }
         risk_averse_factors = list(res.keys())
@@ -448,7 +470,7 @@ class EMS:
         worst = [res[l]["worst"] for l in risk_averse_factors]
         plt.plot(risk_averse_factors, cvars, label="CVaR")
         plt.plot(risk_averse_factors, expected, label="Expected Profit")
-        plt.plot(risk_averse_factors, worst, label="Worst-Case Profit")
+        # plt.plot(risk_averse_factors, worst, label="Worst-Case Profit")
         plt.title(f"Battery: {POWER} MW, {CAPACITY} MWh")
         plt.xlabel("Risk Averse Factor")
         plt.ylabel("Value (eur)")
@@ -458,8 +480,7 @@ class EMS:
         plt.show()
 
     def __solve_two_stage_robust(self, x_forecast, y_scenarios,
-                                 start_time_y, end_time_y, prev_bids,
-                                 risk_averse_factor=RISK_AVERSE_FACTOR):
+                                 start_time_y, end_time_y, prev_bids):
 
         model = gp.Model("Master Combined")
         model.setParam('OutputFlag', 0)  # Turn off Gurobi output
@@ -496,8 +517,8 @@ class EMS:
             -y_scenarios[s][t - start_time_y] * y[t, s] for t in range(start_time_y, end_time_y)) for s in range(NUM_SCENARIOS)}
 
         worst_y = model.addVar(name="worst-case_scenario_profit")
-        model.addConstr(worst_y <= gp.quicksum(
-            scenario_profit[s] for s in range(NUM_SCENARIOS)))
+        model.addConstrs(
+            worst_y <= scenario_profit[s] for s in range(NUM_SCENARIOS))
 
         profit_x = gp.quicksum(-x_forecast[t] * x[t] for t in range(HORIZON))
         model.setObjective(profit_x + worst_y,
@@ -505,6 +526,8 @@ class EMS:
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
+            print("Forecasted profit x:", profit_x.getValue())
+            print("Worst-case scenario profit:", worst_y.X)
             return (
                 [x[t].x for t in range(HORIZON)],
                 [[y[t, s].x for t in range(start_time_y, end_time_y)]
@@ -673,6 +696,7 @@ class EMS:
             first_stage_forecast = self.__forecast(first_stage)
             second_stage_scenarios = self.get_scenarios(
                 self.__forecast(second_stage), second_stage, SCENARIO_TYPE)
+
             start_time_y, end_time_y = self.__get_trading_window(second_stage)
 
             print("BEST SCENARIO SMAPE:", min([
@@ -680,7 +704,7 @@ class EMS:
                 for second_stage_scenario in second_stage_scenarios
             ]))
 
-            if PLOT_CVARS and first_stage == "DA" and self.data.date == '2023-12-30':
+            if PLOT_CVARS and first_stage == "DA" and self.data.date.day == 12:
                 self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
                                   end_time_y, prev_bids)
 
