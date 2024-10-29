@@ -9,6 +9,7 @@ from utilsforecast.losses import smape
 from statsforecast.models import MSTL, AutoARIMA
 import gurobipy as gp
 from gurobipy import GRB
+import pprint
 import matplotlib.pyplot as plt
 plt.style.use('fivethirtyeight')
 plt.rcParams['lines.linewidth'] = 1.5
@@ -42,13 +43,13 @@ MAX_TRADE = POWER / 2  # MW per half-hour
 EFFICIENCY = 1
 
 # 'stochastic', 'robust' or 'deterministic'
-MODEL_TYPE = 'stochastic'
-RISK_AVERSE_FACTOR = 1
-BETA = 0.95
+MODEL_TYPE = 'robust'
+RISK_AVERSE_FACTOR = 0.75
+BETA = 0.99
 
 # 'block', 'standard', 'monte_carlo' or 'dexter'
 SCENARIO_TYPE = 'dexter'
-NUM_SCENARIOS = 100
+NUM_SCENARIOS = 10
 
 SHOW_FINAL_SCHEDULE = False
 PLOT_CVARS = False
@@ -58,36 +59,44 @@ SHOW_SCENARIOS = False
 def main():
     ems = EMS(Data())
     max_days = ems.data.testing_data['DA'].shape[0] // 48
-
     results = ems.run(max_days)
-    results['params'] = {
-        'POWER': POWER,
-        'CAPACITY': CAPACITY,
-        'MAX_TRADE': MAX_TRADE,
-        'EFFICIENCY': EFFICIENCY,
-        'RISK_AVERSE_FACTOR': RISK_AVERSE_FACTOR,
-        'BETA': BETA,
-        'NUM_SCENARIOS': NUM_SCENARIOS,
-        'SCENARIO_TYPE': SCENARIO_TYPE,
-    }
+    pprint.pprint(results)
     print(
         f"Overall profit: {sum([day['profit'] for day in results['results'].values()])}")
 
-    results_dir = 'results'
-    os.makedirs(results_dir, exist_ok=True)
-    subfolder_name = f'{MODEL_TYPE}/battery_{POWER}MW_{CAPACITY}MWh'
-    subfolder_path = os.path.join(results_dir, subfolder_name)
-    if not os.path.exists(subfolder_path):
-        os.makedirs(subfolder_path)
-    subfolder_path = os.path.join(results_dir, subfolder_name)
-    os.makedirs(subfolder_path, exist_ok=True)
-    if MODEL_TYPE == 'stochastic':
-        results_file = os.path.join(
-            subfolder_path, f'run_results_l={RISK_AVERSE_FACTOR}.json')
-    else:
-        results_file = os.path.join(subfolder_path, 'run_results.json')
-    with open(results_file, 'w') as f:
-        json.dump(results, f, indent=4)
+# def main():
+#     ems = EMS(Data())
+#
+
+#     results = ems.run(max_days)
+#     results['params'] = {
+#         'POWER': POWER,
+#         'CAPACITY': CAPACITY,
+#         'MAX_TRADE': MAX_TRADE,
+#         'EFFICIENCY': EFFICIENCY,
+#         'RISK_AVERSE_FACTOR': RISK_AVERSE_FACTOR,
+#         'BETA': BETA,
+#         'NUM_SCENARIOS': NUM_SCENARIOS,
+#         'SCENARIO_TYPE': SCENARIO_TYPE,
+#     }
+#     print(
+#         f"Overall profit: {sum([day['profit'] for day in results['results'].values()])}")
+
+#     results_dir = 'results'
+#     os.makedirs(results_dir, exist_ok=True)
+#     subfolder_name = f'{MODEL_TYPE}/battery_{POWER}MW_{CAPACITY}MWh'
+#     subfolder_path = os.path.join(results_dir, subfolder_name)
+#     if not os.path.exists(subfolder_path):
+#         os.makedirs(subfolder_path)
+#     subfolder_path = os.path.join(results_dir, subfolder_name)
+#     os.makedirs(subfolder_path, exist_ok=True)
+#     if MODEL_TYPE == 'stochastic':
+#         results_file = os.path.join(
+#             subfolder_path, f'run_results_l={RISK_AVERSE_FACTOR}.json')
+#     else:
+#         results_file = os.path.join(subfolder_path, 'run_results.json')
+#     with open(results_file, 'w') as f:
+#         json.dump(results, f, indent=4)
 
 
 class Data:
@@ -133,6 +142,15 @@ class Data:
             'ds': pd.date_range(start=self.date, periods=48, freq='30min'),
             'unique_id': 1,
         })
+        # self.insert_spike('IDA1', self.date)
+
+    def insert_spike(self, auction_name, date):
+        date_mask = self.testing_data[auction_name]['ds'].dt.date == date
+        peak_index = self.testing_data[auction_name].loc[date_mask, 'y'].idxmax(
+        )
+        self.testing_data[auction_name].at[peak_index - 1, 'y'] *= 1.5
+        self.testing_data[auction_name].at[peak_index, 'y'] *= 2.5
+        self.testing_data[auction_name].at[peak_index + 1, 'y'] *= 1.5
 
     def get_forecast_from_file(self, auction_name):
         exo_vars = self.training_data[auction_name].drop(
@@ -285,7 +303,7 @@ class EMS:
         )
         return sf
 
-    def get_scenarios(self, forecast, auction_name, type):
+    def get_scenarios(self, forecast, auction_name, type='dexter'):
         if type == 'block':
             return self.__get_block_scenarios(forecast, auction_name)
         elif type == 'standard':
@@ -299,13 +317,16 @@ class EMS:
 
     def __get_dexter_scenarios(self, forecast, auction_name):
         cross_val = self.data.cross_vals[auction_name].copy()
+        cross_val = cross_val[cross_val['ds'].dt.date >= (
+            self.data.date - pd.Timedelta(days=30))]
         residuals = cross_val.groupby(
             [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error']
 
         quantiles = np.linspace(0, 1, NUM_SCENARIOS)
         scenarios = [forecast]
         for quantile in quantiles:
-            errors = residuals.quantile(quantile).values
+            errors = residuals.quantile(
+                quantile).values
             scenario = np.add(forecast, errors)
             scenarios.append(scenario)
 
@@ -313,6 +334,16 @@ class EMS:
             self.data.plot_scenarios(scenarios, auction_name)
 
         return scenarios
+
+    def get_bounds(self, forecast, auction_name):
+        cross_val = self.data.cross_vals[auction_name].copy()
+        cross_val = cross_val[cross_val['ds'].dt.date >= (
+            self.data.date - pd.Timedelta(days=30))]
+        residuals = cross_val.groupby(
+            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error']
+        lb = np.add(forecast, residuals.quantile(0.05).values)
+        ub = np.add(forecast, residuals.quantile(0.95).values)
+        return lb, ub
 
     def __get_block_scenarios(self, forecast, auction_name, block_size=8):
         cross_val = self.data.cross_vals[auction_name].copy()
@@ -479,9 +510,8 @@ class EMS:
         plt.legend()
         plt.show()
 
-    def __solve_two_stage_robust(self, x_forecast, y_scenarios,
+    def __solve_two_stage_robust(self, x_forecast, lower_bounds, upper_bounds,
                                  start_time_y, end_time_y, prev_bids):
-
         model = gp.Model("Master Combined")
         model.setParam('OutputFlag', 0)  # Turn off Gurobi output
 
@@ -491,6 +521,8 @@ class EMS:
                           name="adjustments")
         soc = model.addVars(HORIZON+1, NUM_SCENARIOS,
                             lb=0, ub=CAPACITY, name="soc")
+        prices_y = model.addVars(HORIZON, NUM_SCENARIOS, name="prices_y")
+        worst_y = model.addVar(lb=-GRB.INFINITY, name="worst_case_profit")
 
         for s in range(NUM_SCENARIOS):
             model.addConstr(soc[0, s] == 0, name=f"initial_soc_s{s}")
@@ -499,9 +531,18 @@ class EMS:
             for s in range(NUM_SCENARIOS):
                 if t < start_time_y or t >= end_time_y:
                     model.addConstr(y[t, s] == 0)
+                    model.addConstr(prices_y[t, s] == 0)
+                else:
+                    model.addConstr(
+                        prices_y[t, s] >= lower_bounds[t - start_time_y],
+                    )
+                    model.addConstr(
+                        prices_y[t, s] <= upper_bounds[t - start_time_y],
+                    )
 
                 model.addConstr(
-                    soc[t+1, s] == soc[t, s] + x[t] + y[t, s] + prev_bids[t],
+                    soc[t+1, s] == soc[t, s] +
+                    x[t] + y[t, s] + prev_bids[t],
                     name=f"soc_balance_t{t}_s{s}"
                 )
                 model.addConstr(
@@ -514,30 +555,33 @@ class EMS:
                 )
 
         scenario_profit = {s: gp.quicksum(
-            -y_scenarios[s][t - start_time_y] * y[t, s] for t in range(start_time_y, end_time_y)) for s in range(NUM_SCENARIOS)}
-
-        worst_y = model.addVar(name="worst-case_scenario_profit")
+            -prices_y[t, s] * y[t, s] for t in range(start_time_y, end_time_y)) for s in range(NUM_SCENARIOS)}
         model.addConstrs(
             worst_y <= scenario_profit[s] for s in range(NUM_SCENARIOS))
+        profit_x = gp.quicksum(-x_forecast[t] * x[t]
+                               for t in range(HORIZON))
 
-        profit_x = gp.quicksum(-x_forecast[t] * x[t] for t in range(HORIZON))
-        model.setObjective(profit_x + worst_y,
-                           GRB.MAXIMIZE)
+        model.setObjective(profit_x + worst_y, GRB.MAXIMIZE)
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
+            print("worst prices y:", [
+                  prices_y[t, 0].X for t in range(start_time_y, end_time_y)])
+            print("y:", [y[t, 0].X for t in range(start_time_y, end_time_y)])
+
             print("Forecasted profit x:", profit_x.getValue())
             print("Worst-case scenario profit:", worst_y.X)
             return (
                 [x[t].x for t in range(HORIZON)],
                 [[y[t, s].x for t in range(start_time_y, end_time_y)]
-                 for s in range(NUM_SCENARIOS)],
+                    for s in range(NUM_SCENARIOS)],
                 [[soc[t+1, s].x for t in range(HORIZON)]
-                 for s in range(NUM_SCENARIOS)],
+                    for s in range(NUM_SCENARIOS)],
                 np.nan,
                 worst_y.X
             )
         else:
+            print(model.status)
             raise Exception("Master is infeasible")
 
     def __solve_two_stage(self, x_forecast, y_scenarios,
@@ -602,6 +646,7 @@ class EMS:
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
+            model.printAttr('X')
             return (
                 [x[t].x for t in range(HORIZON)],
                 [[y[t, s].x for t in range(start_time_y, end_time_y)]
@@ -775,23 +820,17 @@ class EMS:
             print("Second stage:", second_stage)
 
             first_stage_forecast = self.__forecast(first_stage)
-            second_stage_scenarios = self.get_scenarios(
-                self.__forecast(second_stage), second_stage, SCENARIO_TYPE)
+            second_stage_lb, second_stage_ub = self.get_bounds(
+                self.__forecast(second_stage), second_stage)
             start_time_y, end_time_y = self.__get_trading_window(second_stage)
 
-            print("BEST SCENARIO SMAPE:", min([
-                self.data.calculate_smape(second_stage, second_stage_scenario)
-                for second_stage_scenario in second_stage_scenarios
-            ]))
-
             bids, ys, _, cvar, z = self.__solve_two_stage_robust(
-                first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, prev_bids)
+                first_stage_forecast, second_stage_lb, second_stage_ub, start_time_y, end_time_y, prev_bids)
             schedules[first_stage] = bids
             prev_bids = np.add(prev_bids, bids)
 
             first_stage_actual = self.data.get_actual_prices(first_stage)
-            scenario_profits = [np.dot(-np.array(prices), y)
-                                for prices, y in zip(second_stage_scenarios, ys)]
+
             stats[first_stage] = {
                 'cvar': cvar,
                 'volume_traded': sum([abs(bid) for bid in bids]),
@@ -799,11 +838,7 @@ class EMS:
                 'profit': np.dot(-np.array(first_stage_actual), bids),
                 'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids),
                 'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast),
-                'scenario_stats': {
-                    f'{second_stage}_profit_std': np.std(scenario_profits),
-                    f'{second_stage}_max_profit': max(scenario_profits),
-                    f'{second_stage}_min_profit': z
-                }
+                'worst_case_scenario': z
             }
 
             self.data.realize_prices(first_stage)
