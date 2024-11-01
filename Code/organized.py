@@ -30,6 +30,7 @@ dark_style = {
 plt.rcParams.update(dark_style)
 plt.rcParams['figure.figsize'] = (15, 10)
 pd.options.display.float_format = '{:.2f}'.format
+# from abc import ABC, abstractmethod
 
 HORIZON = 48
 
@@ -44,648 +45,293 @@ RISK_AVERSE_FACTOR = 0
 BETA = 0.95
 NUM_SCENARIOS = 100
 
-SHOW_FINAL_SCHEDULE = True
+SHOW_FINAL_SCHEDULE = False
 CVAR_PLOT_DAY = None
 SHOW_SCENARIOS = False
 
 
-def main():
-    ems = EMS(Data())
-    max_days = ems.data.testing_data['DA'].shape[0] // 48
-
-    results = ems.run(max_days)
-    results['params'] = {
-        'POWER': POWER,
-        'CAPACITY': CAPACITY,
-        'MAX_TRADE': MAX_TRADE,
-        'EFFICIENCY': EFFICIENCY,
-        'RISK_AVERSE_FACTOR': RISK_AVERSE_FACTOR,
-        'BETA': BETA,
-        'NUM_SCENARIOS': NUM_SCENARIOS,
-    }
-
-    results_dir = 'results'
-    os.makedirs(results_dir, exist_ok=True)
-    subfolder_name = f'{MODEL_TYPE}/battery_{POWER}MW_{CAPACITY}MWh'
-    subfolder_path = os.path.join(results_dir, subfolder_name)
-    if not os.path.exists(subfolder_path):
-        os.makedirs(subfolder_path)
-    subfolder_path = os.path.join(results_dir, subfolder_name)
-    os.makedirs(subfolder_path, exist_ok=True)
-    if MODEL_TYPE == 'stochastic':
-        results_file = os.path.join(
-            subfolder_path, f'run_results_l={RISK_AVERSE_FACTOR}.json')
-    else:
-        results_file = os.path.join(subfolder_path, 'run_results.json')
-    with open(results_file, 'w') as f:
-        json.dump(results, f, indent=4)
-
-
-class Data:
-    def __init__(self):
-        df = pd.read_excel('./Data/IDA & DA Ierland 2023.xlsx')
-        self.da = pd.DataFrame({
-            'ds': df['Datetime'],
-            'unique_id': 1,
-            'y': df['IE DA EUR']
-        })
-        self.ida1 = pd.DataFrame({
-            'ds': df['Datetime'],
-            'unique_id': 1,
-            'y': df['IE IDA1 EUR price']
-        })
-        self.ida2 = pd.DataFrame({
-            'ds': df['Datetime'],
-            'unique_id': 1,
-            'y': df['IE IDA2 EUR price']
-        })
-        self.cross_vals = {}
-        self.cross_vals['DA'] = pd.read_excel(
-            './Data/Crossvalidation/cross_val_30_days_da.xlsx')
-        self.cross_vals['IDA1'] = pd.read_excel(
-            './Data/Crossvalidation/cross_val_30_days_ida1.xlsx')
-        self.cross_vals['IDA2'] = pd.read_excel(
-            './Data/Crossvalidation/cross_val_30_days_ida2.xlsx')
-        self.__split_data()
-
-    def __split_data(self):
-        train_ida1, test_ida1 = self.ida1[self.ida1['ds'].dt.month <
-                                          12], self.ida1[self.ida1['ds'].dt.month >= 12]
-        train_ida2, test_ida2 = self.ida2[self.ida2['ds'].dt.month <
-                                          12], self.ida2[self.ida2['ds'].dt.month >= 12]
-        train_da, test_da = self.da[self.da['ds'].dt.month <
-                                    12], self.da[self.da['ds'].dt.month >= 12]
-        self.date = test_da['ds'].iloc[0].date()
-        self.training_data = {'DA': train_da,
-                              'IDA1': train_ida1, 'IDA2': train_ida2}
-        self.testing_data = {'DA': test_da,
-                             'IDA1': test_ida1, 'IDA2': test_ida2}
-        self.prediction_day = pd.DataFrame({
-            'ds': pd.date_range(start=self.date, periods=48, freq='30min'),
-            'unique_id': 1,
-        })
-
-    def insert_spike(self, auction_name):
-        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-        self.testing_data[auction_name].loc[date_mask, 'y']
-        max_index = self.testing_data[auction_name].loc[date_mask, 'y'].idxmax(
-        )
-        self.testing_data[auction_name].loc[max_index, 'y'] *= 0.25
-        print("Spike inserted at",
-              self.testing_data[auction_name].loc[max_index, 'ds'])
-
-    def get_forecast_from_file(self, auction_name):
-        exo_vars = self.training_data[auction_name].drop(
-            columns=['y', 'ds', 'unique_id']).columns.tolist()
-
-        print(
-            f"Retrieving: ./Data/Forecasts/{auction_name}/{self.date}_exo{exo_vars}.xlsx")
-
-        forecast = pd.read_excel(
-            f'./Data/Forecasts/{auction_name}/{self.date}_exo{exo_vars}.xlsx')
-
-        return forecast['MSTL'].values
-
-    def move_to_next_day(self):
-        self.__update_past_errors()
-        self.date += pd.Timedelta(days=1)
-        self.training_data['DA'] = self.da[self.da['ds'].dt.date <
-                                           self.date]
-        self.training_data['IDA1'] = self.ida1[self.ida1['ds'].dt.date <
-                                               self.date]
-        self.training_data['IDA2'] = self.ida2[self.ida2['ds'].dt.date <
-                                               self.date]
-        self.testing_data['DA'] = self.da[self.da['ds'].dt.date >=
-                                          self.date]
-        self.testing_data['IDA1'] = self.ida1[self.ida1['ds'].dt.date >=
-                                              self.date]
-        self.testing_data['IDA2'] = self.ida2[self.ida2['ds'].dt.date >=
-                                              self.date]
-        self.prediction_day = pd.DataFrame({
-            'ds': pd.date_range(start=self.date, periods=48, freq='30min'),
-            'unique_id': 1,
-        })
-
-    def __update_past_errors(self):
-        for auction_name in self.cross_vals.keys():
-            print(f"\nUpdating cross-validation for {auction_name}")
-            cross_val = self.cross_vals[auction_name]
-            y = self.get_actual_prices(auction_name)
-            mstl = self.get_forecast_from_file(auction_name)
-            trading_hours = cross_val['ds'].dt.hour.unique()
-            timeframe_mask = self.prediction_day['ds'].dt.floor(
-                'h').dt.hour.isin(trading_hours)
-            df = pd.DataFrame({
-                'ds': self.prediction_day['ds'].loc[timeframe_mask],
-                'y': y,
-                'MSTL': mstl,
-                'error': y - mstl
-            })
-            self.cross_vals[auction_name] = pd.concat(
-                [cross_val, df]).reset_index(drop=True)
-            print(
-                f"Forecasting errors taken from past {len(cross_val['ds'].dt.date.unique())} days")
-            print("Mean error updated from", cross_val['error'].mean(
-            ), "to", self.cross_vals[auction_name]['error'].mean())
-            print("Std error updated from", cross_val['error'].std(
-            ), "to", self.cross_vals[auction_name]['error'].std())
-
-    def realize_prices(self, auction_name):
-        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-        auction_prices = self.testing_data[auction_name].loc[date_mask, 'y'].values
-        self.prediction_day[f'y_{auction_name}'] = auction_prices
-
-        auctions = ['DA', 'IDA1', 'IDA2']
-        for key in auctions[auctions.index(auction_name)+1:]:
-            print(f"Adding {auction_name} prices to {key} training data")
-            self.training_data[key] = self.training_data[key].copy()
-            merged_data = pd.merge(self.training_data[key],
-                                   self.training_data[auction_name][[
-                                       'ds', 'y']],
-                                   on='ds',
-                                   how='left',  # Keep all original rows for key
-                                   suffixes=('', f'_{auction_name}'))
-            self.training_data[key] = merged_data
-
-    def get_actual_prices(self, auction_name):
-        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-        return self.testing_data[auction_name].loc[date_mask, 'y'].dropna().values
-
-    def plot_scenarios(self, scenarios, auction_name):
-        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-        real_prices = self.testing_data[auction_name].loc[date_mask, [
-            'y', 'ds']].dropna()
-        plt.plot(real_prices['ds'], real_prices['y'], label='Real Prices')
-        for scenario in scenarios:
-            plt.plot(real_prices['ds'], scenario)
-        plt.legend()
-        plt.show()
-
-    def calculate_smape(self, auction_name, forecast):
-        date_mask = self.testing_data[auction_name]['ds'].dt.date == self.date
-        actual = self.testing_data[auction_name].loc[date_mask, 'y'].dropna(
-        ).values
-        nmae = np.sum(np.abs(actual - forecast)) / np.sum(np.abs(actual))
-        # return round(smape(pd.DataFrame({'y': actual, 'y_hat': forecast, 'unique_id': 1}), [
-        # 'y_hat']).iloc[0, 1]*100, 2)
-        return nmae*100
-
-
-class EMS:
-    def __init__(self, data):
-        self.data = data
-
-    def __forecast(self, auction_name):
-        try:
-            forecast = self.data.get_forecast_from_file(auction_name)
-            print("SMAPE:", self.data.calculate_smape(auction_name, forecast))
-            return forecast
-        except:
-            train = self.data.training_data[auction_name]
-            train.dropna(inplace=True)
-            train.reset_index(drop=True, inplace=True)
-            exos = train.drop(
-                columns=['y', 'ds', 'unique_id']).columns.tolist()
-            print(
-                f"FILE NOT FOUND: Forecasting for {auction_name} on {self.data.date} using exogeneous variables: {exos}")
-            trading_hours = train['ds'].dt.hour.unique()
-
-            X_df = self.data.prediction_day[train.drop(columns=['y']).columns]
-            timeframe_mask = X_df['ds'].dt.floor(
-                'h').dt.hour.isin(trading_hours)
-            X_df = X_df.loc[timeframe_mask]
-
-            trading_length = len(trading_hours) * 2
-
-            print("timeframe:", X_df['ds'].iloc[0], "to", X_df['ds'].iloc[-1])
-            model = self.__create_mstl(
-                seasons=[trading_length, 2*trading_length])
-            forecast = model.forecast(
-                df=train, h=len(X_df), X_df=X_df)
-
-            forecast.reset_index(drop=True, inplace=True)
-            forecast['ds'] = X_df['ds'].reset_index(drop=True)
-
-            print("SMAPE:", self.data.calculate_smape(
-                auction_name, forecast['MSTL'].values))
-            forecast.to_excel(
-                f'./Data/Forecasts/{auction_name}/{self.data.date}_exo{exos}.xlsx', index=False)
-            return forecast['MSTL'].values
-
-    def __create_mstl(self, seasons):
-        models = [
-            MSTL(season_length=seasons,
-                 trend_forecaster=AutoARIMA(seasonal=True)
-                 )
-        ]
-        sf = StatsForecast(
-            models=models,
-            freq='30min',
-        )
-        return sf
-
-    def __get_dexter_scenarios(self, forecast, auction_name):
-        cross_val = self.data.cross_vals[auction_name].copy()
-        cross_val = cross_val[cross_val['ds'].dt.date >= (
-            self.data.date - pd.Timedelta(days=30))]
-        residuals = cross_val.groupby(
-            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error']
-
-        quantiles = np.linspace(0, 1, NUM_SCENARIOS)
-        scenarios = [forecast]
-        for quantile in quantiles:
-            errors = residuals.quantile(
-                quantile).values
-            scenario = np.add(forecast, errors)
-            scenarios.append(scenario)
-
-        if SHOW_SCENARIOS:
-            self.data.plot_scenarios(scenarios, auction_name)
-
-        return scenarios
-
-    def get_bounds(self, forecast, auction_name):
-        cross_val = self.data.cross_vals[auction_name].copy()
-        cross_val = cross_val[cross_val['ds'].dt.date >= (
-            self.data.date - pd.Timedelta(days=30))]
-        residuals = cross_val.groupby(
-            [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error']
-        lb = np.add(forecast, residuals.quantile(0.05).values)
-        ub = np.add(forecast, residuals.quantile(0.95).values)
-        if SHOW_SCENARIOS:
-            plt.plot(forecast, label='Forecast')
-            plt.plot(lb, label='Lower Bound')
-            plt.plot(ub, label='Upper Bound')
-            plt.legend()
-            plt.show()
-        return lb, ub
-
-    def __get_trading_window(self, auction_name):
-        start_time = self.data.training_data[auction_name].dropna()[
-            'ds'].dt.hour.min() * 2
-        end_time = (self.data.training_data[auction_name].dropna()[
-            'ds'].dt.hour.max() + 1) * 2
-        return start_time, end_time
-
-    def __calculate_profit(self, schedules):
-        profit = 0
-        for auction in ['DA', 'IDA1', 'IDA2']:
-            if auction in schedules:
-                date_mask = self.data.testing_data[auction]['ds'].dt.date == self.data.date
-                actual_prices = self.data.testing_data[auction].loc[date_mask, 'y'].fillna(0
-                                                                                           ).values
-                profit += np.dot(-np.array(actual_prices),
-                                 schedules[auction])
-        return profit
-
-    def __show_schedule(self, schedules, prices, soc_levels):
-        _, (price_ax, power_ax) = plt.subplots(2, 1)
-
-        schedule = pd.DataFrame()
-        for auction, bids in schedules.items():
-            schedule[auction] = bids
-        schedule.index = self.data.prediction_day['ds']
-        schedule.plot(kind='bar', stacked=True, ax=power_ax)
-
-        power_ax.plot(soc_levels, color='yellow', label='SOC')
-
-        for auction, price_path in zip(schedule.keys(), prices):
-            price_ax.plot(price_path, label=f'{auction} Prices')
-        price_ax.set_ylabel("Price (eur)")
-        power_ax.sharex(price_ax)
-
-        plt.suptitle(f"Battery: {POWER} MW, {CAPACITY} MWh")
-        plt.xticks(range(0, 48, 8), range(0, 24, 4))
-        plt.xlabel("Time (hours)")
-        power_ax.axhline(y=0, color='w', linestyle='-', alpha=0.2, zorder=1)
-        price_ax.axhline(y=0, color='w', linestyle='-', alpha=0.2, zorder=1)
-        power_ax.axvline(x=0, color='w', linestyle='-', alpha=0.2, zorder=1)
-        price_ax.axvline(x=0, color='w', linestyle='-', alpha=0.2, zorder=1)
-        price_ax.legend()
-        power_ax.legend()
-        plt.show()
-
-    def __plot_cvars(self, first_stage_forecast, second_stage_scenarios,
-                     start_time_y, end_time_y, soc):
-        print("Day:", self.data.date)
-        res = {}
-        # for l in np.linspace(0, 1, 11):
-        for l in [0, 0.25, 0.5, 0.75, 1]:
-            bids, adjustments, _, cvar, expected_profit = self.__solve_two_stage(
-                first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, soc, risk_averse_factor=l)
-
-            scenario_profits = [np.dot(-np.array(first_stage_forecast), bids) + np.dot(-np.array(
-                prices), trades) for trades, prices in zip(adjustments, second_stage_scenarios)]
-
-            res[l] = {
-                "cvar": cvar,
-                "expected": expected_profit,
-                "worst": min(scenario_profits),
-                "std": np.std(scenario_profits),
-            }
-        risk_averse_factors = list(res.keys())
-        cvars = [res[l]["cvar"] for l in risk_averse_factors]
-        print("cvars = ", cvars)
-        expected = [res[l]["expected"] for l in risk_averse_factors]
-        print("expected = ", expected)
-        worst = [res[l]["worst"] for l in risk_averse_factors]
-        print("worst = ", worst)
-        std = [res[l]["std"] for l in risk_averse_factors]
-        plt.plot(risk_averse_factors, cvars, label="CVaR")
-        plt.plot(risk_averse_factors, expected, label="Expected Profit")
-        # plt.plot(risk_averse_factors, std, label="Scenario Profit Std")
-        plt.plot(risk_averse_factors, worst, label="Worst-Case Profit")
-        plt.title(f"Battery: {POWER} MW, {CAPACITY} MWh")
-        plt.xlabel("Risk Averse Factor")
-        plt.ylabel("Value (eur)")
-        plt.axhline(y=0, color='w', linestyle='-', alpha=0.2, zorder=1)
-        plt.axvline(x=0, color='w', linestyle='-', alpha=0.2, zorder=1)
-        plt.legend()
-        plt.show()
-
-    def __solve_two_stage(self, x_forecast, y_scenarios,
-                          start_time_y, end_time_y, prev_bids,
-                          risk_averse_factor=RISK_AVERSE_FACTOR):
-
-        model = gp.Model("Master Combined")
-        model.setParam('OutputFlag', 0)
-
-        x = model.addVars(HORIZON, lb=-MAX_TRADE,
-                          ub=MAX_TRADE, name="bids")
-        y = model.addVars(HORIZON, NUM_SCENARIOS, lb=-MAX_TRADE, ub=MAX_TRADE,
-                          name="adjustments")
-        soc = model.addVars(HORIZON+1, NUM_SCENARIOS,
-                            lb=0, ub=CAPACITY, name="soc")
-
-        for s in range(NUM_SCENARIOS):
-            model.addConstr(soc[0, s] == 0, name=f"initial_soc_s{s}")
-
-        for t in range(HORIZON):
-            for s in range(NUM_SCENARIOS):
-                if t < start_time_y or t >= end_time_y:
-                    model.addConstr(y[t, s] == 0)
-
-                model.addConstr(
-                    soc[t+1, s] == soc[t, s] + x[t] + y[t, s] + prev_bids[t],
-                    name=f"soc_balance_t{t}_s{s}"
-                )
-                model.addConstr(
-                    soc[t+1, s] <= soc[t, s] + POWER,
-                    name=f"physical_charge_limit_t{t}_s{s}"
-                )
-                model.addConstr(
-                    soc[t+1, s] >= soc[t, s] - POWER,
-                    name=f"physical_discharge_limit_t{t}_s{s}"
-                )
-
-        scenario_profit = {s: gp.quicksum(
-            -y_scenarios[s][t - start_time_y] * y[t, s] for t in range(start_time_y, end_time_y)) for s in range(NUM_SCENARIOS)}
-        expected_scenario_profit = (
-            1/NUM_SCENARIOS)*gp.quicksum(scenario_profit[s] for s in range(NUM_SCENARIOS))
-
-        alpha = model.addVar(lb=0, name="VaR")
-        z = model.addVars(NUM_SCENARIOS, lb=0, name="excess_loss")
-        loss = model.addVars(NUM_SCENARIOS, lb=0, name="loss")
-        cvar = model.addVar(lb=0, name="cvar")
-
-        for s in range(NUM_SCENARIOS):
-            model.addConstr(
-                loss[s] >= expected_scenario_profit - scenario_profit[s])
-            model.addConstr(z[s] >= loss[s] - alpha)
-        model.addConstr(cvar >= alpha + (1 / (NUM_SCENARIOS * (1 - BETA)))
-                        * gp.quicksum(z[s] for s in range(NUM_SCENARIOS)))
-
-        expected_profit = gp.quicksum(
-            (-x_forecast[t] * x[t]) for t in range(HORIZON)) + expected_scenario_profit
-        model.setObjective(((1-risk_averse_factor)*expected_profit) - (cvar *
-                           risk_averse_factor), GRB.MAXIMIZE)
-        model.optimize()
-
-        if model.status == GRB.OPTIMAL:
-            model.printAttr('X')
-            return (
-                [x[t].x for t in range(HORIZON)],
-                [[y[t, s].x for t in range(start_time_y, end_time_y)]
-                 for s in range(NUM_SCENARIOS)],
-                [[soc[t+1, s].x for t in range(HORIZON)]
-                 for s in range(NUM_SCENARIOS)],
-                cvar.X,
-                expected_profit.getValue()
-            )
-        else:
-            raise Exception("Master is infeasible")
-
-    def __solve_single(self, forecast, prev_bids, start_time_x, end_time_x):
-        print("Trading period length:", len(forecast))
-
-        model = gp.Model("Master Combined")
-        model.setParam('OutputFlag', 0)  # Turn off Gurobi output
-
-        x = model.addVars(HORIZON, lb=-MAX_TRADE,
-                          ub=MAX_TRADE, name="bids")
-        soc = model.addVars(HORIZON+1, lb=0, ub=CAPACITY, name="soc")
-
-        model.addConstr(soc[0] == 0, name="initial_soc")
-
-        for t in range(HORIZON):
-            if t < start_time_x or t >= end_time_x:
-                model.addConstr(x[t] == 0)
-
-            model.addConstr(
-                soc[t+1] == soc[t] + x[t] + prev_bids[t],
-                name=f"soc_balance_t{t}"
-            )
-            model.addConstr(
-                soc[t+1] <= soc[t] + POWER,
-                name=f"physical_charge_limit_t{t}"
-            )
-            model.addConstr(
-                soc[t+1] >= soc[t] - POWER,
-                name=f"physical_discharge_limit_t{t}"
-            )
-
-        profit = gp.quicksum(-forecast[t - start_time_x] * x[t]
-                             for t in range(start_time_x, end_time_x))
-
-        model.setObjective(profit, GRB.MAXIMIZE)
-        model.optimize()
-
-        if model.status == GRB.OPTIMAL:
-            schedule = [x[t].x for t in range(
-                start_time_x, end_time_x)]
-            profits = [-price*bid for price,
-                       bid in zip(forecast, schedule)]
-            if sum(profits) != model.objVal:
-                print("Model's objective value:", model.objVal)
-                print("Actual Profit:", sum(profits))
-                raise Exception("Objective value does not match actual profit")
-            if sum(schedule) > 0 and all([price > 0 for price in forecast]) and NUM_SCENARIOS == 0:
-                print("schedule =", schedule)
-                print("forecast =", forecast)
-                raise Exception("Net volume left")
-            if sum([x[t].x for t in range(HORIZON)]) > 0 and sum(schedule) == 0:
-                print("somethings not right")
-                print("schedule =", schedule)
-                print("bids =", [x[t].x for t in range(HORIZON)])
-                raise Exception("Schedules don't match")
-            return (
-                [x[t].x for t in range(HORIZON)],
-                [soc[t+1].x for t in range(HORIZON)]
-            )
-        else:
-            print(f"forecast = {forecast}")
-            print(f"prev_bids = {prev_bids}")
-            print(f"start_time = {start_time_x}")
-            print(f"end_time = {end_time_x}")
-            self.__show_schedule({'Previous Bids': prev_bids}, [
-                                 forecast], np.cumsum(prev_bids))
-            raise Exception("Master is infeasible")
-
-    def __run_stochastic(self):
-        print("Forecasting day:", self.data.date)
-
-        first_stage = "DA"
-        second_stage = "IDA1"
-        next_stages = ["IDA2"]
-        schedules = {}
-        prev_bids = [0] * HORIZON
-        stats = {}
-        while second_stage:
-            print("First stage:", first_stage)
-            print("Second stage:", second_stage)
-
-            first_stage_forecast = self.__forecast(first_stage)
-            second_stage_scenarios = self.__get_dexter_scenarios(
-                self.__forecast(second_stage), second_stage)
-
-            start_time_y, end_time_y = self.__get_trading_window(second_stage)
-
-            print("BEST SCENARIO SMAPE:", min([
-                self.data.calculate_smape(second_stage, second_stage_scenario)
-                for second_stage_scenario in second_stage_scenarios
-            ]))
-
-            if first_stage == "DA" and self.data.date.day == CVAR_PLOT_DAY:
-                self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
-                                  end_time_y, prev_bids)
-
-            bids, ys, _, cvar, _ = self.__solve_two_stage(
-                first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, prev_bids)
-            schedules[first_stage] = bids
-            prev_bids = np.add(prev_bids, bids)
-
-            first_stage_actual = self.data.get_actual_prices(first_stage)
-            scenario_profits = [np.dot(-np.array(prices), y)
-                                for prices, y in zip(second_stage_scenarios, ys)]
-            stats[first_stage] = {
-                'cvar': cvar,
-                'volume_traded': sum([abs(bid) for bid in bids]),
-                'net_volume_traded': sum(bids),
-                'profit': np.dot(-np.array(first_stage_actual), bids),
-                'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids),
-                'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast),
-                'scenario_stats': {
-                    f'{second_stage}_profit_std': np.std(scenario_profits),
-                    f'{second_stage}_max_profit': max(scenario_profits),
-                    f'{second_stage}_min_profit': min(scenario_profits)
-                }
-            }
-
-            self.data.realize_prices(first_stage)
-            first_stage = second_stage
-            second_stage = next_stages.pop(0) if next_stages else None
-            print("\n")
-
-        print("First stage:", first_stage)
-        start_time, end_time = self.__get_trading_window(first_stage)
-        first_stage_forecast = self.__forecast(first_stage)
-        bids, final_soc = self.__solve_single(
-            first_stage_forecast, prev_bids, start_time, end_time)
-        schedules[first_stage] = bids
-
-        self.data.realize_prices(first_stage)
-        total_profit = self.__calculate_profit(schedules)
-
-        stats[first_stage] = {
-            'volume_traded': sum([abs(bid) for bid in bids[start_time:end_time]]),
-            'net_volume_traded': sum(bids[start_time:end_time]),
-            'profit': np.dot(-np.array(self.data.get_actual_prices(first_stage)), bids[start_time:end_time]),
-            'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids[start_time:end_time]),
-            'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast)
-        }
-
-        cycles = np.abs(np.diff(final_soc)).sum() / (CAPACITY * 2)
-        if SHOW_FINAL_SCHEDULE:
-            realized_prices = [
-                self.data.prediction_day[f'y_{auction}'] for auction in schedules.keys()]
-            self.__show_schedule(schedules, realized_prices, final_soc)
-
-        return stats, total_profit, cycles
-
-    def __run_deterministic(self):
-        first_stage = "DA"
-        next_stages = ["IDA1", "IDA2"]
-        schedule = {}
-        stats = {}
-        prev_bids = [0] * HORIZON
-        while first_stage:
-
-            forecast = self.__forecast(first_stage)
-            start_time, end_time = self.__get_trading_window(first_stage)
-
-            bids, soc = self.__solve_single(
-                forecast, prev_bids, start_time, end_time)
-            prev_bids = np.add(
-                prev_bids, bids)
-            schedule[first_stage] = bids
-
-            self.data.realize_prices(first_stage)
-            print(
-                f"Actual Profit {first_stage}: {np.dot(-self.data.prediction_day[f'y_{first_stage}'].dropna(),bids[start_time:end_time])}")
-
-            actual = self.data.get_actual_prices(first_stage)
-            stats[first_stage] = {
-                'bids': bids,
-                'volume_traded': sum([abs(bid) for bid in bids]),
-                'net_volume_traded': sum(bids),
-                'profit': np.dot(-np.array(actual), bids[start_time:end_time]),
-                'forecasted_profit': np.dot(-np.array(forecast), bids[start_time:end_time]),
-                'SMAPE': self.data.calculate_smape(first_stage, forecast),
-            }
-            first_stage = next_stages.pop(0) if next_stages else None
-
-        if SHOW_FINAL_SCHEDULE:
-            realized_prices = [
-                self.data.prediction_day[f'y_{auction}'] for auction in schedule.keys()]
-            self.__show_schedule(schedule, realized_prices, soc)
-
-        total_profit = self.__calculate_profit(schedule)
-        cycles = np.abs(np.diff(soc)).sum() / (CAPACITY * 2)
-        return stats, total_profit, cycles
-
-    def run(self, num_days):
-        results = {}
-        for _ in range(num_days):
-            print(f'\nRunning day {self.data.date}')
-            print("=====================================\n")
-            stages, profit, cycles = None, None, None
-            if MODEL_TYPE == 'stochastic':
-                stages, profit, cycles = self.__run_stochastic()
-            elif MODEL_TYPE == 'deterministic':
-                stages, profit, cycles = self.__run_deterministic()
-            else:
-                raise ValueError("Invalid model type")
-
-            results[self.data.date.strftime('%Y-%m-%d')] = {
-                'profit': profit,
-                'auctions': stages,
-                'cycles': cycles
-            }
-            self.data.move_to_next_day()
-            print("\n")
-
-        return {"results": results}
-
-
-if __name__ == '__main__':
-    main()
+
+# def main():
+#     ems = EMS(Data())
+#     max_days = ems.data.testing_data['DA'].shape[0] // 48
+
+#     results = ems.run(max_days)
+#     results['params'] = {
+#         'POWER': POWER,
+#         'CAPACITY': CAPACITY,
+#         'MAX_TRADE': MAX_TRADE,
+#         'EFFICIENCY': EFFICIENCY,
+#         'RISK_AVERSE_FACTOR': RISK_AVERSE_FACTOR,
+#         'BETA': BETA,
+#         'NUM_SCENARIOS': NUM_SCENARIOS,
+#     }
+
+#     results_dir = 'results'
+#     os.makedirs(results_dir, exist_ok=True)
+#     subfolder_name = f'{MODEL_TYPE}/battery_{POWER}MW_{CAPACITY}MWh'
+#     subfolder_path = os.path.join(results_dir, subfolder_name)
+#     if not os.path.exists(subfolder_path):
+#         os.makedirs(subfolder_path)
+#     subfolder_path = os.path.join(results_dir, subfolder_name)
+#     os.makedirs(subfolder_path, exist_ok=True)
+#     if MODEL_TYPE == 'stochastic':
+#         results_file = os.path.join(
+#             subfolder_path, f'run_results_l={RISK_AVERSE_FACTOR}.json')
+#     else:
+#         results_file = os.path.join(subfolder_path, 'run_results.json')
+#     with open(results_file, 'w') as f:
+#         json.dump(results, f, indent=4)
+
+
+# class Data:
+
+#     def insert_spike(self, auction):
+#         date_mask = self.testing_data[auction]['ds'].dt.date == self.date
+#         self.testing_data[auction].loc[date_mask, 'y']
+#         max_index = self.testing_data[auction].loc[date_mask, 'y'].idxmax(
+#         )
+#         self.testing_data[auction].loc[max_index, 'y'] *= 0.25
+#         print("Spike inserted at",
+#               self.testing_data[auction].loc[max_index, 'ds'])
+
+#     def get_forecast_from_file(self, auction):
+#         exo_vars = self.training_data[auction].drop(
+#             columns=['y', 'ds', 'unique_id']).columns.tolist()
+
+#         print(
+#             f"Retrieving: ./Data/Forecasts/{auction}/{self.date}_exo{exo_vars}.xlsx")
+
+#         forecast = pd.read_excel(
+#             f'./Data/Forecasts/{auction}/{self.date}_exo{exo_vars}.xlsx')
+
+#         return forecast['MSTL'].values
+
+# class EMS:
+#     def __init__(self, data):
+#         self.data = data
+
+#     def __forecast(self, auction):
+#         try:
+#             forecast = self.data.get_forecast_from_file(auction)
+#             print("SMAPE:", self.data.calculate_smape(auction, forecast))
+#             return forecast
+#         except:
+#             train = self.data.training_data[auction]
+#             train.dropna(inplace=True)
+#             train.reset_index(drop=True, inplace=True)
+#             exos = train.drop(
+#                 columns=['y', 'ds', 'unique_id']).columns.tolist()
+#             print(
+#                 f"FILE NOT FOUND: Forecasting for {auction} on {self.data.date} using exogeneous variables: {exos}")
+#             trading_hours = train['ds'].dt.hour.unique()
+
+#             X_df = self.data.prediction_day[train.drop(columns=['y']).columns]
+#             timeframe_mask = X_df['ds'].dt.floor(
+#                 'h').dt.hour.isin(trading_hours)
+#             X_df = X_df.loc[timeframe_mask]
+
+#             trading_length = len(trading_hours) * 2
+
+#             print("timeframe:", X_df['ds'].iloc[0], "to", X_df['ds'].iloc[-1])
+#             model = self.__create_mstl(
+#                 seasons=[trading_length, 2*trading_length])
+#             forecast = model.forecast(
+#                 df=train, h=len(X_df), X_df=X_df)
+
+#             forecast.reset_index(drop=True, inplace=True)
+#             forecast['ds'] = X_df['ds'].reset_index(drop=True)
+
+#             print("SMAPE:", self.data.calculate_smape(
+#                 auction, forecast['MSTL'].values))
+#             forecast.to_excel(
+#                 f'./Data/Forecasts/{auction}/{self.data.date}_exo{exos}.xlsx', index=False)
+#             return forecast['MSTL'].values
+
+#     def __plot_cvars(self, first_stage_forecast, second_stage_scenarios,
+#                      start_time_y, end_time_y, soc):
+#         print("Day:", self.data.date)
+#         res = {}
+#         # for l in np.linspace(0, 1, 11):
+#         for l in [0, 0.25, 0.5, 0.75, 1]:
+#             bids, adjustments, _, cvar, expected_profit = self.__solve_two_stage(
+#                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, soc, risk_averse_factor=l)
+
+#             scenario_profits = [np.dot(-np.array(first_stage_forecast), bids) + np.dot(-np.array(
+#                 prices), trades) for trades, prices in zip(adjustments, second_stage_scenarios)]
+
+#             res[l] = {
+#                 "cvar": cvar,
+#                 "expected": expected_profit,
+#                 "worst": min(scenario_profits),
+#                 "std": np.std(scenario_profits),
+#             }
+#         risk_averse_factors = list(res.keys())
+#         cvars = [res[l]["cvar"] for l in risk_averse_factors]
+#         print("cvars = ", cvars)
+#         expected = [res[l]["expected"] for l in risk_averse_factors]
+#         print("expected = ", expected)
+#         worst = [res[l]["worst"] for l in risk_averse_factors]
+#         print("worst = ", worst)
+#         std = [res[l]["std"] for l in risk_averse_factors]
+#         plt.plot(risk_averse_factors, cvars, label="CVaR")
+#         plt.plot(risk_averse_factors, expected, label="Expected Profit")
+#         # plt.plot(risk_averse_factors, std, label="Scenario Profit Std")
+#         plt.plot(risk_averse_factors, worst, label="Worst-Case Profit")
+#         plt.title(f"Battery: {POWER} MW, {CAPACITY} MWh")
+#         plt.xlabel("Risk Averse Factor")
+#         plt.ylabel("Value (eur)")
+#         plt.axhline(y=0, color='w', linestyle='-', alpha=0.2, zorder=1)
+#         plt.axvline(x=0, color='w', linestyle='-', alpha=0.2, zorder=1)
+#         plt.legend()
+#         plt.show()
+
+#
+
+#     def __run_stochastic(self):
+#         print("Forecasting day:", self.data.date)
+
+#         first_stage = "DA"
+#         second_stage = "IDA1"
+#         next_stages = ["IDA2"]
+#         schedules = {}
+#         prev_bids = [0] * HORIZON
+#         stats = {}
+#         while second_stage:
+#             print("First stage:", first_stage)
+#             print("Second stage:", second_stage)
+
+#             first_stage_forecast = self.__forecast(first_stage)
+#             second_stage_scenarios = self.__get_dexter_scenarios(
+#                 self.__forecast(second_stage), second_stage)
+
+#             start_time_y, end_time_y = self.__get_trading_window(second_stage)
+
+#             print("BEST SCENARIO SMAPE:", min([
+#                 self.data.calculate_smape(second_stage, second_stage_scenario)
+#                 for second_stage_scenario in second_stage_scenarios
+#             ]))
+
+#             if first_stage == "DA" and self.data.date.day == CVAR_PLOT_DAY:
+#                 self.__plot_cvars(first_stage_forecast, second_stage_scenarios, start_time_y,
+#                                   end_time_y, prev_bids)
+
+#             bids, ys, _, cvar, _ = self.__solve_two_stage(
+#                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, prev_bids)
+#             schedules[first_stage] = bids
+#             prev_bids = np.add(prev_bids, bids)
+
+#             first_stage_actual = self.data.get_actual_prices(first_stage)
+#             scenario_profits = [np.dot(-np.array(prices), y)
+#                                 for prices, y in zip(second_stage_scenarios, ys)]
+#             stats[first_stage] = {
+#                 'cvar': cvar,
+#                 'volume_traded': sum([abs(bid) for bid in bids]),
+#                 'net_volume_traded': sum(bids),
+#                 'profit': np.dot(-np.array(first_stage_actual), bids),
+#                 'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids),
+#                 'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast),
+#                 'scenario_stats': {
+#                     f'{second_stage}_profit_std': np.std(scenario_profits),
+#                     f'{second_stage}_max_profit': max(scenario_profits),
+#                     f'{second_stage}_min_profit': min(scenario_profits)
+#                 }
+#             }
+
+#             self.data.realize_prices(first_stage)
+#             first_stage = second_stage
+#             second_stage = next_stages.pop(0) if next_stages else None
+#             print("\n")
+
+#         print("First stage:", first_stage)
+#         start_time, end_time = self.__get_trading_window(first_stage)
+#         first_stage_forecast = self.__forecast(first_stage)
+#         bids, final_soc = self.__solve_single(
+#             first_stage_forecast, prev_bids, start_time, end_time)
+#         schedules[first_stage] = bids
+
+#         self.data.realize_prices(first_stage)
+#         total_profit = self.__calculate_profit(schedules)
+
+#         stats[first_stage] = {
+#             'volume_traded': sum([abs(bid) for bid in bids[start_time:end_time]]),
+#             'net_volume_traded': sum(bids[start_time:end_time]),
+#             'profit': np.dot(-np.array(self.data.get_actual_prices(first_stage)), bids[start_time:end_time]),
+#             'forecasted_profit': np.dot(-np.array(first_stage_forecast), bids[start_time:end_time]),
+#             'SMAPE': self.data.calculate_smape(first_stage, first_stage_forecast)
+#         }
+
+#         cycles = np.abs(np.diff(final_soc)).sum() / (CAPACITY * 2)
+#         if SHOW_FINAL_SCHEDULE:
+#             realized_prices = [
+#                 self.data.prediction_day[f'y_{auction}'] for auction in schedules.keys()]
+#             self.__show_schedule(schedules, realized_prices, final_soc)
+
+#         return stats, total_profit, cycles
+
+#     def __run_deterministic(self):
+#         first_stage = "DA"
+#         next_stages = ["IDA1", "IDA2"]
+#         schedule = {}
+#         stats = {}
+#         prev_bids = [0] * HORIZON
+#         while first_stage:
+
+#             forecast = self.__forecast(first_stage)
+#             start_time, end_time = self.__get_trading_window(first_stage)
+
+#             bids, soc = self.__solve_single(
+#                 forecast, prev_bids, start_time, end_time)
+#             prev_bids = np.add(
+#                 prev_bids, bids)
+#             schedule[first_stage] = bids
+
+#             self.data.realize_prices(first_stage)
+#             print(
+#                 f"Actual Profit {first_stage}: {np.dot(-self.data.prediction_day[f'y_{first_stage}'].dropna(),bids[start_time:end_time])}")
+
+#             actual = self.data.get_actual_prices(first_stage)
+#             stats[first_stage] = {
+#                 'bids': bids,
+#                 'volume_traded': sum([abs(bid) for bid in bids]),
+#                 'net_volume_traded': sum(bids),
+#                 'profit': np.dot(-np.array(actual), bids[start_time:end_time]),
+#                 'forecasted_profit': np.dot(-np.array(forecast), bids[start_time:end_time]),
+#                 'SMAPE': self.data.calculate_smape(first_stage, forecast),
+#             }
+#             first_stage = next_stages.pop(0) if next_stages else None
+
+#         if SHOW_FINAL_SCHEDULE:
+#             realized_prices = [
+#                 self.data.prediction_day[f'y_{auction}'] for auction in schedule.keys()]
+#             self.__show_schedule(schedule, realized_prices, soc)
+
+#         total_profit = self.__calculate_profit(schedule)
+#         cycles = np.abs(np.diff(soc)).sum() / (CAPACITY * 2)
+#         return stats, total_profit, cycles
+
+#     def run(self, num_days):
+#         results = {}
+#         for _ in range(num_days):
+#             print(f'\nRunning day {self.data.date}')
+#             print("=====================================\n")
+#             stages, profit, cycles = None, None, None
+#             if MODEL_TYPE == 'stochastic':
+#                 stages, profit, cycles = self.__run_stochastic()
+#             elif MODEL_TYPE == 'deterministic':
+#                 stages, profit, cycles = self.__run_deterministic()
+#             else:
+#                 raise ValueError("Invalid model type")
+
+#             results[self.data.date.strftime('%Y-%m-%d')] = {
+#                 'profit': profit,
+#                 'auctions': stages,
+#                 'cycles': cycles
+#             }
+#             self.data.move_to_next_day()
+#             print("\n")
+
+#         return {"results": results}
+
+
+# if __name__ == '__main__':
+#     main()

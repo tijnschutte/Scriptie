@@ -1,0 +1,6 @@
+lightning_logs/
+__pycache__/
+.ipynb_checkpoints
+node_modules/
+.vscode/
+.DS_Store
