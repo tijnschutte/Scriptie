@@ -1,10 +1,9 @@
 import json
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from Classes.battery import Battery
 from Classes.data import AuctionData
-from Classes.sEMS import StochasticEMS
+from Classes.ems import StochasticEMS
 from Classes.simulate import Simulation
 from config import *
 plt.style.use('fivethirtyeight')
@@ -35,7 +34,7 @@ pd.options.display.float_format = '{:.2f}'.format
 def main():
     battery = Battery(POWER, CAPACITY, MAX_TRADE, EFFICIENCY)
     auction_data = AuctionData()
-    ems = StochasticEMS(battery, auction_data)
+    ems = StochasticEMS(battery, auction_data, RISK_AVERSE_FACTOR)
     sim = Simulation(ems, auction_data)
 
     res = sim.run(31)

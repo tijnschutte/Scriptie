@@ -20,8 +20,8 @@ class AuctionData:
             'y': df['IE IDA2 EUR price']
         })
         self.cross_vals = {}
-        self.cross_vals['DA'] = pd.read_excel(
-            './Data/Crossvalidation/cross_val_30_days_da.xlsx')
+        # self.cross_vals['DA'] = pd.read_excel(
+        #     './Data/Crossvalidation/cross_val_30_days_da.xlsx')
         self.cross_vals['IDA1'] = pd.read_excel(
             './Data/Crossvalidation/cross_val_30_days_ida1.xlsx')
         self.cross_vals['IDA2'] = pd.read_excel(
@@ -66,10 +66,11 @@ class AuctionData:
         })
 
     def update_past_errors(self):
-        for auction in self.cross_vals.keys():
+        exos = {'IDA1': [], 'IDA2': ['y_DA']}
+        for auction in exos.keys():
             cross_val = self.cross_vals[auction]
             y = self.get_auction_prices(auction)
-            # todo: cross-val is only used for scenario generation, so we should get the forecast when auction was the second stage
+            # fixme: cross-val still needs to be done with auctions as second stages
             forecast = self.get_forecast_from_file(auction)
             trading_hours = cross_val['ds'].dt.hour.unique()
             timeframe_mask = self.prediction_day['ds'].dt.floor(
@@ -88,8 +89,8 @@ class AuctionData:
         date_mask = self.testing_data[auction]['ds'].dt.date == self.current_date
         return self.testing_data[auction].loc[date_mask, 'y'].dropna().values
 
-    def get_forecast_from_file(self, auction):
-        exo_vars = self.training_data[auction].drop(
+    def get_forecast_from_file(self, auction, given_exos=None):
+        exo_vars = given_exos if given_exos is not None else self.training_data[auction].drop(
             columns=['y', 'ds', 'unique_id']).columns.tolist()
         file = f'./Data/Forecasts/{auction}/{self.current_date}_exo{exo_vars}.xlsx'
         print(f"getting forecast from {file}")
