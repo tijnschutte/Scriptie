@@ -21,10 +21,13 @@ class Simulation:
                 'auctions': stages,
                 'cycles': cycles
             }
+
             self.auction_data.move_to_next_day()
+            print(
+                f"Current total profit: {sum([v['profit'] for v in results.values()])}")
 
         print(f"Total profit: {sum([v['profit'] for v in results.values()])}")
-        return {"results": results}
+        return results
 
     def summarize_results(self):
         pass

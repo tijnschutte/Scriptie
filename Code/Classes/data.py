@@ -3,43 +3,57 @@ import pandas as pd
 
 class AuctionData:
     def __init__(self):
-        df = pd.read_excel('./Data/IDA & DA Ierland 2023.xlsx')
+        df = pd.read_excel('./Data/market_data.xlsx')
         self.da = pd.DataFrame({
-            'ds': df['Datetime'],
+            'ds': df['Date'],
             'unique_id': 1,
             'y': df['IE DA EUR']
         })
         self.ida1 = pd.DataFrame({
-            'ds': df['Datetime'],
+            'ds': df['Date'],
             'unique_id': 1,
             'y': df['IE IDA1 EUR price']
         })
         self.ida2 = pd.DataFrame({
-            'ds': df['Datetime'],
+            'ds': df['Date'],
             'unique_id': 1,
             'y': df['IE IDA2 EUR price']
         })
-        self.cross_vals = {}
-        # self.cross_vals['DA'] = pd.read_excel(
-        #     './Data/Crossvalidation/cross_val_30_days_da.xlsx')
-        self.cross_vals['IDA1'] = pd.read_excel(
-            './Data/Crossvalidation/cross_val_30_days_ida1.xlsx')
-        self.cross_vals['IDA2'] = pd.read_excel(
-            './Data/Crossvalidation/cross_val_30_days_ida2.xlsx')
+        self.cross_vals = {
+            'IDA1': pd.read_excel('./Data/Crossvalidation/cross_val_ida1.xlsx'),
+            'IDA2': pd.read_excel('./Data/Crossvalidation/cross_val_ida2.xlsx')
+        }
+        self.__clean_data()
         self.__split_data()
 
+    def __clean_data(self):
+        self.da = self.da.resample(
+            '30min', on='ds').mean().interpolate().reset_index()
+        self.da['ds'] = self.da['ds'].dt.floor('s')
+
+        self.ida1 = self.ida1.resample(
+            '30min', on='ds').mean().interpolate().reset_index()
+        self.ida1['ds'] = self.ida1['ds'].dt.floor('s')
+
+        self.ida2['ds'] = self.ida2['ds'].dt.floor('s')
+
     def __split_data(self):
-        train_ida1, test_ida1 = self.ida1[self.ida1['ds'].dt.month <
-                                          12], self.ida1[self.ida1['ds'].dt.month >= 12]
-        train_ida2, test_ida2 = self.ida2[self.ida2['ds'].dt.month <
-                                          12], self.ida2[self.ida2['ds'].dt.month >= 12]
-        train_da, test_da = self.da[self.da['ds'].dt.month <
-                                    12], self.da[self.da['ds'].dt.month >= 12]
+        train_ida1, test_ida1 = self.ida1[self.ida1['ds'].dt.year <
+                                          2023], self.ida1[self.ida1['ds'].dt.year == 2023]
+        train_ida2, test_ida2 = self.ida2[self.ida2['ds'].dt.year <
+                                          2023], self.ida2[self.ida2['ds'].dt.year == 2023]
+        train_da, test_da = self.da[self.da['ds'].dt.year <
+                                    2023], self.da[self.da['ds'].dt.year == 2023]
         self.current_date = test_da['ds'].iloc[0].date()
         self.training_data = {'DA': train_da,
-                              'IDA1': train_ida1, 'IDA2': train_ida2}
+                              'IDA1': train_ida1,
+                              'IDA2': train_ida2
+                              }
         self.testing_data = {'DA': test_da,
-                             'IDA1': test_ida1, 'IDA2': test_ida2}
+                             'IDA1': test_ida1,
+                             'IDA2': test_ida2
+                             }
+        self.max_sim_length = len(self.testing_data['DA'])
         self.prediction_day = pd.DataFrame({
             'ds': pd.date_range(start=self.current_date, periods=48, freq='30min'),
             'unique_id': 1,

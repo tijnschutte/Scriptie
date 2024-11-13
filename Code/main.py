@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from Classes.battery import Battery
 from Classes.data import AuctionData
-from Classes.ems import StochasticEMS
+from Classes.test import StressTest
+from Classes.ems import StochasticEMS, DeterministicEMS
 from Classes.simulate import Simulation
 from config import *
 plt.style.use('fivethirtyeight')
@@ -35,9 +36,12 @@ def main():
     battery = Battery(POWER, CAPACITY, MAX_TRADE, EFFICIENCY)
     auction_data = AuctionData()
     ems = StochasticEMS(battery, auction_data, RISK_AVERSE_FACTOR)
-    sim = Simulation(ems, auction_data)
+    # ems = DeterministicEMS(battery, auction_data)
 
-    res = sim.run(31)
+    sim = Simulation(ems, auction_data)
+    res = sim.run(auction_data.max_sim_length)
+
+    pd.DataFrame(res).to_excel('results.xlsx')
     pretty_res = json.dumps(res, indent=4)
     print(pretty_res)
 
