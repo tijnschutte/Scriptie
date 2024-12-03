@@ -1,0 +1,11 @@
+lightning_logs/
+__pycache__/
+.ipynb_checkpoints
+node_modules/
+*.ilps
+*.xlsx
+/Data/
+/Papers/
+/Results/
+.vscode/
+.DS_Store
