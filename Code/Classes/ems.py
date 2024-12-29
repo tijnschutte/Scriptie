@@ -7,6 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from config import *
 
+DA = "DA"
+IDA1 = "IDA1"
+IDA2 = "IDA2"
+
 
 class EMS:
     def __init__(self, battery, auction_data, risk_averse_factor=None):
@@ -33,13 +37,14 @@ class EMS:
             print(f"MNAE: {rating:.2f}%")
             return forecast
         except:
-            train = self.auction_data.training_data[auction]
-            train.dropna(inplace=True)
-            train.reset_index(drop=True, inplace=True)
+            train = self.auction_data.training_data[auction].copy()
+            train = train.dropna()
+            train = train.reset_index(drop=True)
             exos = train.drop(
                 columns=['y', 'ds', 'unique_id']).columns.tolist()
+            print(f"FILE NOT FOUND: doing it myself...")
             print(
-                f"FILE NOT FOUND: Forecasting for {auction} on {self.auction_data.current_date} using exogeneous variables: {exos}")
+                f"Forecasting for {auction} on {self.auction_data.current_date} using exogeneous variables:{exos}")
             trading_hours = train['ds'].dt.hour.unique()
 
             X_df = self.auction_data.prediction_day[train.drop(
@@ -48,47 +53,39 @@ class EMS:
                 'h').dt.hour.isin(trading_hours)
             X_df = X_df.loc[timeframe_mask]
 
+            lookback = 1000 if auction == IDA2 else 2500
             trading_length = len(trading_hours) * 2
 
             print("timeframe:", X_df['ds'].iloc[0], "to", X_df['ds'].iloc[-1])
             model = self.__create_mstl(
-                seasons=[trading_length, 2*trading_length])
+                seasons=[trading_length, 7*trading_length])
             forecast = model.forecast(
-                df=train, h=len(X_df), X_df=X_df)
+                df=train.tail(lookback), h=len(X_df), X_df=X_df)
 
             forecast.reset_index(drop=True, inplace=True)
             forecast['ds'] = X_df['ds'].reset_index(drop=True)
 
             forecast.to_excel(
-                f'./Data/Forecasts/{auction}/{self.auction_data.current_date}_exo{exos}.xlsx', index=False)
+                f'./Data/Forecasts/test/{YEAR}/{auction}/{self.auction_data.current_date}_exo{exos}.xlsx', index=False)
             rating = self.rate_forecast(auction, forecast['MSTL'].values)
             print(f'{rating:.2f}%')
             return forecast['MSTL'].values
 
     def plot_schedule(self, schedules, soc_levels):
-        # fixme:
         _, (price_ax, power_ax) = plt.subplots(2, 1, sharex=True)
         common_index = self.auction_data.prediction_day['ds']
 
         schedule = pd.DataFrame(index=common_index)
         for auction, bids in schedules.items():
-            bid_series = pd.Series(bids, index=common_index)
+            start_time, end_time = self.auction_data.get_trading_window(
+                auction)
+            bid_series = pd.Series(
+                bids, index=common_index.iloc[start_time:end_time])
             schedule[auction] = bid_series.reindex(
                 common_index, fill_value=None)
         schedule.plot(kind='bar', stacked=True, ax=power_ax)
 
         power_ax.plot(soc_levels, label='SOC', color='orange', linewidth=2)
-
-        price_df = pd.DataFrame(index=common_index)
-        for auction in schedules.keys():
-            auction_prices = self.auction_data.get_auction_prices(auction)
-            start_time, end_time = self.auction_data.get_trading_window(
-                auction)
-            price_series = pd.Series(
-                auction_prices, index=common_index[start_time:end_time])
-            price_series = price_series.reindex(common_index, fill_value=None)
-            price_df[auction] = price_series
-        price_df.plot(ax=price_ax)
 
         plt.suptitle(
             f"Battery: {self.battery.power} MW, {self.battery.capacity} MWh")
@@ -107,28 +104,23 @@ class EMS:
         profit = 0
         for auction, schedule in schedules.items():
             prices = self.auction_data.get_auction_prices(auction)
-            print(len(prices), len(schedule))
             if len(prices) != len(schedule):
-                print(prices)
-                print(schedule)
                 raise Exception(
                     f"Length of prices ({len(prices)}) and schedule ({len(schedule)}) do not match")
-
             profit += np.dot(-np.array(prices), schedule)
         return profit
 
-    def get_stats(self, auction, forecast, bids, cvar=0):
+    def get_stats(self, auction, forecast, bids, cvar=0, best_scenario=np.nan):
         actual = self.auction_data.get_auction_prices(auction)
+
         return {
             'cvar': cvar,
+            'best_scenario_smape': best_scenario,
             'volume_traded': sum([abs(bid) for bid in bids]),
             'net_volume_traded': sum(bids),
             'profit': np.dot(-np.array(actual), bids),
             'forecasted_profit': np.dot(-np.array(forecast), bids),
             'SMAPE': self.rate_forecast(auction, forecast),
-            'bids': bids,
-            'actual_prices': actual,
-            'forecast': forecast
         }
 
     def rate_forecast(self, auction, forecast):
@@ -140,8 +132,10 @@ class EMS:
 
     def generate_scenarios(self, forecast, auction):
         cross_val = self.auction_data.cross_vals[auction].copy()
-        # cross_val = cross_val[cross_val['ds'].dt.date >= (
-        #     self.auction_data.current_date - pd.Timedelta(days=30))]
+        lookback = 3  # months
+        cutoff = self.auction_data.current_date - \
+            pd.Timedelta(weeks=lookback*4)
+        cross_val = cross_val[cross_val['ds'].dt.date >= cutoff]
         residuals = cross_val.groupby(
             [cross_val['ds'].dt.hour, cross_val['ds'].dt.minute])['error']
 
@@ -191,6 +185,7 @@ class StochasticEMS(EMS):
 
         x = model.addVars(HORIZON, lb=-self.battery.max_trade,
                           ub=self.battery.max_trade, name="bids")
+
         y = model.addVars(HORIZON, NUM_SCENARIOS, lb=-self.battery.max_trade, ub=self.battery.max_trade,
                           name="adjustments")
         soc = model.addVars(HORIZON+1, NUM_SCENARIOS,
@@ -235,7 +230,7 @@ class StochasticEMS(EMS):
                         * gp.quicksum(z[s] for s in range(NUM_SCENARIOS))))
 
         expected_profit = gp.quicksum(
-            (-x_forecast[t] * x[t]) for t in range(HORIZON)) + expected_scenario_profit
+            -x_forecast[t] * x[t] for t in range(HORIZON)) + expected_scenario_profit
         model.setObjective(((1-self.risk_averse_factor)*expected_profit) - (cvar *
                            self.risk_averse_factor), GRB.MAXIMIZE)
         model.optimize()
@@ -248,7 +243,7 @@ class StochasticEMS(EMS):
                 [[soc[t+1, s].x for t in range(HORIZON)]
                  for s in range(NUM_SCENARIOS)],
                 cvar.X,
-                expected_scenario_profit.getValue()
+                [scenario_profit[s].getValue() for s in range(NUM_SCENARIOS)]
             )
         else:
             raise Exception(f"Master failed with status {model.status}")
@@ -296,7 +291,8 @@ class StochasticEMS(EMS):
             raise Exception(f"Master failed with status {model.status}")
 
     def run(self):
-        first_stage, second_stage, next_stages = "DA", "IDA1", ["IDA2"]
+        stages = [(DA, IDA1), (IDA1, IDA2), (IDA2, None)]
+        first_stage, second_stage = stages.pop(0)
         prev_bids = [0] * HORIZON
         stats = {}
         schedules = {}
@@ -306,17 +302,22 @@ class StochasticEMS(EMS):
             first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y = super().prepare_two_stage(
                 first_stage, second_stage)
 
+            best_scenario = np.inf
+            for scenario in second_stage_scenarios:
+                rating = super().rate_forecast(second_stage, scenario)
+                best_scenario = min(best_scenario, rating)
+
             bids, _, _, cvar, _ = self.__solve_two_stage(
                 first_stage_forecast, second_stage_scenarios, start_time_y, end_time_y, prev_bids)
             schedules[first_stage] = bids
             prev_bids = np.add(prev_bids, bids)
 
             stats[first_stage] = super().get_stats(
-                first_stage, first_stage_forecast, bids, cvar)
+                first_stage, first_stage_forecast, bids, cvar, best_scenario)
 
             self.auction_data.realize_prices(first_stage)
-            first_stage = second_stage
-            second_stage = next_stages.pop(0) if next_stages else None
+
+            first_stage, second_stage = stages.pop(0)
 
         print(f"\nStages: \n1. {first_stage}")
 
@@ -327,10 +328,6 @@ class StochasticEMS(EMS):
         bids, final_soc = self.__solve_final_stage(
             forecast, prev_bids, start_time, end_time)
         schedules[first_stage] = bids
-        if max(final_soc) > self.battery.capacity:
-            raise Exception("Battery capacity ub exceeded")
-        elif min(final_soc) < 0:
-            raise Exception("Battery capacity lb exceeded")
 
         stats[first_stage] = super().get_stats(
             first_stage, forecast, bids)
@@ -343,6 +340,48 @@ class StochasticEMS(EMS):
             super().plot_schedule(schedules, final_soc)
 
         return stats, total_profit, cycles
+
+    def plot_cvars(self):
+        forecast = self.forecast(DA)
+        scenarios = self.generate_scenarios(self.forecast(IDA1), IDA1)
+        start_time, end_time = self.auction_data.get_trading_window(IDA1)
+
+        res = {}
+        lambdas = np.linspace(0, 1, 11)
+
+        for l in lambdas:
+            self.risk_averse_factor = l
+            bids, _, _, cvar, scenario_profits = self.__solve_two_stage(
+                forecast, scenarios, start_time, end_time, [0]*HORIZON)
+
+            e_profit_da = np.dot(-np.array(forecast), bids)
+            e_total_profit = e_profit_da + \
+                (1/NUM_SCENARIOS)*sum(scenario_profits)
+            e_min_profit = e_profit_da + min(scenario_profits)
+            e_max_profit = e_profit_da + max(scenario_profits)
+            res[l] = {
+                "cvar": -cvar,
+                "e_total_profit": e_total_profit,
+                "e_min_profit": e_min_profit,
+                "e_max_profit": e_max_profit,
+                "std": np.std([e_profit_da + scenario for scenario in scenario_profits])
+            }
+
+        self.risk_averse_factor = RISK_AVERSE_FACTOR
+
+        pd.DataFrame(res).to_excel(
+            f'cvars_{self.auction_data.current_date}.xlsx')
+
+        plt.plot(res.keys(), [v['cvar'] for v in res.values()], label='CVaR')
+        plt.plot(res.keys(), [v["e_total_profit"]
+                 for v in res.values()], label='Expected Profit')
+        # plt.plot(res.keys(), [v["e_min_profit"]
+        #          for v in res.values()], label='Min Profit')
+        # plt.plot(res.keys(), [v["e_max_profit"] for v in res.values()], label='Max Profit')
+        plt.axhline(y=0, color='gray', alpha=0.5, zorder=1)
+        plt.axvline(x=0, color='gray', alpha=0.5, zorder=1)
+        plt.legend()
+        plt.show()
 
 
 class DeterministicEMS(EMS):
@@ -384,7 +423,7 @@ class DeterministicEMS(EMS):
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
-            return [x[t].x for t in range(start_time, end_time)],
+            return [x[t].x for t in range(start_time, end_time)]
         else:
             raise Exception(f"Master failed with status {model.status}")
 
@@ -392,7 +431,7 @@ class DeterministicEMS(EMS):
         prev_bids = [0] * HORIZON
         stats = {}
         schedules = {}
-        for stage in ["DA", "IDA1", "IDA2"]:
+        for stage in [DA, IDA1, IDA2]:
             print(f"\nCurrent auction: {stage}")
 
             forecast = super().forecast(stage)

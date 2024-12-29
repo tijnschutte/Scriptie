@@ -1,3 +1,4 @@
+import pandas as pd
 from config import *
 
 
@@ -7,12 +8,17 @@ class Simulation:
         self.auction_data = auction_data
         self.results = []
 
-    def run(self, sim_length):
+    def run(self, end_date):
 
         results = {}
-        for _ in range(sim_length):
+
+        print(f"Running simulation until {end_date}")
+        while self.auction_data.current_date <= end_date:
             print(f"\n{self.auction_data.current_date}")
             print("===========")
+
+            if CVAR_PLOT_DAY != None and self.auction_data.current_date == pd.to_datetime(CVAR_PLOT_DAY).date():
+                self.ems.plot_cvars()
 
             stages, profit, cycles = self.ems.run()
 

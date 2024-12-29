@@ -1,4 +1,5 @@
 import pandas as pd
+from config import YEAR
 
 
 class AuctionData:
@@ -20,30 +21,39 @@ class AuctionData:
             'y': df['IE IDA2 EUR price']
         })
         self.cross_vals = {
-            'IDA1': pd.read_excel('./Data/Crossvalidation/cross_val_ida1.xlsx'),
-            'IDA2': pd.read_excel('./Data/Crossvalidation/cross_val_ida2.xlsx')
+            'IDA1': pd.read_excel(f'./Data/Crossvalidation/{YEAR}/cross_val_ida1.xlsx'),
+            'IDA2': pd.read_excel(f'./Data/Crossvalidation/{YEAR}/cross_val_ida2.xlsx')
         }
         self.__clean_data()
         self.__split_data()
+        self.end_date = self.testing_data['DA']['ds'].dt.date.max()
 
     def __clean_data(self):
-        self.da = self.da.resample(
+        da_clean = self.da.copy()
+        da_clean = da_clean.resample(
             '30min', on='ds').mean().interpolate().reset_index()
-        self.da['ds'] = self.da['ds'].dt.floor('s')
+        da_clean['ds'] = da_clean['ds'].dt.floor('s')
+        self.da = da_clean
 
-        self.ida1 = self.ida1.resample(
+        ida1_clean = self.ida1.copy()
+        ida1_clean = ida1_clean.resample(
             '30min', on='ds').mean().interpolate().reset_index()
-        self.ida1['ds'] = self.ida1['ds'].dt.floor('s')
+        ida1_clean['ds'] = ida1_clean['ds'].dt.floor('s')
+        self.ida1 = ida1_clean
 
-        self.ida2['ds'] = self.ida2['ds'].dt.floor('s')
+        ida2_clean = self.ida2.copy()
+        ida2_clean = ida2_clean.resample('30min', on='ds').mean().reset_index()
+        ida2_clean.fillna({'unique_id': 1}, inplace=True)
+        ida2_clean['ds'] = ida2_clean['ds'].dt.floor('s')
+        self.ida2 = ida2_clean
 
     def __split_data(self):
         train_ida1, test_ida1 = self.ida1[self.ida1['ds'].dt.year <
-                                          2023], self.ida1[self.ida1['ds'].dt.year == 2023]
+                                          YEAR], self.ida1[self.ida1['ds'].dt.year == YEAR]
         train_ida2, test_ida2 = self.ida2[self.ida2['ds'].dt.year <
-                                          2023], self.ida2[self.ida2['ds'].dt.year == 2023]
+                                          YEAR], self.ida2[self.ida2['ds'].dt.year == YEAR]
         train_da, test_da = self.da[self.da['ds'].dt.year <
-                                    2023], self.da[self.da['ds'].dt.year == 2023]
+                                    YEAR], self.da[self.da['ds'].dt.year == YEAR]
         self.current_date = test_da['ds'].iloc[0].date()
         self.training_data = {'DA': train_da,
                               'IDA1': train_ida1,
@@ -53,7 +63,6 @@ class AuctionData:
                              'IDA1': test_ida1,
                              'IDA2': test_ida2
                              }
-        self.max_sim_length = len(self.testing_data['DA'])
         self.prediction_day = pd.DataFrame({
             'ds': pd.date_range(start=self.current_date, periods=48, freq='30min'),
             'unique_id': 1,
@@ -82,9 +91,9 @@ class AuctionData:
     def update_past_errors(self):
         exos = {'IDA1': [], 'IDA2': ['y_DA']}
         for auction in exos.keys():
+            print(f"\nUpdating Cross-validation for {auction}\n")
             cross_val = self.cross_vals[auction]
             y = self.get_auction_prices(auction)
-            # fixme: cross-val still needs to be done with auctions as second stages
             forecast = self.get_forecast_from_file(auction)
             trading_hours = cross_val['ds'].dt.hour.unique()
             timeframe_mask = self.prediction_day['ds'].dt.floor(
@@ -97,7 +106,6 @@ class AuctionData:
             })
             self.cross_vals[auction] = pd.concat(
                 [cross_val, df]).reset_index(drop=True)
-            print(f"Cross-validation updated for {auction}\n")
 
     def get_auction_prices(self, auction):
         date_mask = self.testing_data[auction]['ds'].dt.date == self.current_date
@@ -106,7 +114,7 @@ class AuctionData:
     def get_forecast_from_file(self, auction, given_exos=None):
         exo_vars = given_exos if given_exos is not None else self.training_data[auction].drop(
             columns=['y', 'ds', 'unique_id']).columns.tolist()
-        file = f'./Data/Forecasts/{auction}/{self.current_date}_exo{exo_vars}.xlsx'
+        file = f'./Data/Forecasts/test/{YEAR}/{auction}/{self.current_date}_exo{exo_vars}.xlsx'
         print(f"getting forecast from {file}")
         forecast = pd.read_excel(file)
         return forecast['MSTL'].values

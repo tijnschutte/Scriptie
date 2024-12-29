@@ -1,49 +1,47 @@
 import json
 import pandas as pd
-import matplotlib.pyplot as plt
 from Classes.battery import Battery
 from Classes.data import AuctionData
-from Classes.test import StressTest
 from Classes.ems import StochasticEMS, DeterministicEMS
 from Classes.simulate import Simulation
 from config import *
-plt.style.use('fivethirtyeight')
-plt.rcParams['lines.linewidth'] = 1.5
-dark_style = {
-    'figure.facecolor': '#212946',
-    'axes.facecolor': '#212946',
-    'savefig.facecolor': '#212946',
-    'axes.grid': True,
-    'axes.grid.which': 'both',
-    'axes.spines.left': False,
-    'axes.spines.right': False,
-    'axes.spines.top': False,
-    'axes.spines.bottom': False,
-    'grid.color': '#2A3459',
-    'grid.linewidth': '1',
-    'text.color': '0.9',
-    'axes.labelcolor': '0.9',
-    'xtick.color': '0.9',
-    'ytick.color': '0.9',
-    'font.size': 12,
-}
-plt.rcParams.update(dark_style)
-plt.rcParams['figure.figsize'] = (15, 10)
+import matplotlib.pyplot as plt
+# plt.style.use('seaborn-v0_8')
+plt.rcParams.update({
+    'figure.figsize': (8, 6),        # Default figure size
+    'font.size': 12,                # Font size for labels and titles
+    'axes.titlesize': 14,           # Title font size
+    'axes.labelsize': 12,           # Axis label font size
+    'xtick.labelsize': 10,          # X-axis tick size
+    'ytick.labelsize': 10,          # Y-axis tick size
+    'axes.grid': True,              # Add grid by default
+    'grid.alpha': 0.5,              # Make grid lines subtle
+    'grid.linestyle': '--',         # Dashed grid lines
+    'legend.fontsize': 10,          # Legend font size
+    'legend.frameon': True,         # Box around the legend
+    'legend.loc': 'best',           # Best location for the legend
+    'savefig.dpi': 300,             # High-resolution saves
+    'savefig.format': 'png',        # Default save format
+    'lines.linewidth': 1.5,           # Thicker lines
+    'lines.markersize': 6,          # Marker size
+})
+plt.rcParams['font.family'] = 'serif'
 pd.options.display.float_format = '{:.2f}'.format
 
 
 def main():
-    battery = Battery(POWER, CAPACITY, MAX_TRADE, EFFICIENCY)
     auction_data = AuctionData()
-    ems = StochasticEMS(battery, auction_data, RISK_AVERSE_FACTOR)
-    # ems = DeterministicEMS(battery, auction_data)
+
+    battery = Battery(POWER, CAPACITY, MAX_TRADE, EFFICIENCY)
+    ems = StochasticEMS(battery, auction_data, RISK_AVERSE_FACTOR) if RISK_AVERSE_FACTOR != None else DeterministicEMS(
+        battery, auction_data)
 
     sim = Simulation(ems, auction_data)
-    res = sim.run(auction_data.max_sim_length)
+    res = sim.run(auction_data.end_date)
 
-    pd.DataFrame(res).to_excel('results.xlsx')
-    pretty_res = json.dumps(res, indent=4)
-    print(pretty_res)
+    file = f'./Results/{YEAR}/TEST:results_battery={battery.capacity}MWh;{battery.power}MW;{BETA*100}%;l{RISK_AVERSE_FACTOR}.json'
+    with open(file, 'w') as f:
+        json.dump(res, f)
 
 
 if __name__ == '__main__':
