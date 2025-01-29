@@ -1,6 +1,6 @@
 import gurobipy as gp
 from gurobipy import GRB
-from statsforecast.models import MSTL, AutoARIMA
+from statsforecast.models import MSTL, AutoETS
 from statsforecast import StatsForecast
 import pandas as pd
 import numpy as np
@@ -21,7 +21,7 @@ class EMS:
     def __create_mstl(self, seasons):
         models = [
             MSTL(season_length=seasons,
-                 trend_forecaster=AutoARIMA(seasonal=True)
+                 trend_forecaster=AutoETS(model='ZZN')  # exponential smoothing
                  )
         ]
         sf = StatsForecast(
