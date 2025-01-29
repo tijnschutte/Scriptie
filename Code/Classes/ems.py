@@ -66,7 +66,7 @@ class EMS:
             forecast['ds'] = X_df['ds'].reset_index(drop=True)
 
             forecast.to_excel(
-                f'./Data/Forecasts/test/{YEAR}/{auction}/{self.auction_data.current_date}_exo{exos}.xlsx', index=False)
+                f'./Data/Forecasts/{YEAR}/{auction}/{self.auction_data.current_date}_exo{exos}.xlsx', index=False)
             rating = self.rate_forecast(auction, forecast['MSTL'].values)
             print(f'{rating:.2f}%')
             return forecast['MSTL'].values
