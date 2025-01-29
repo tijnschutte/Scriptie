@@ -3,7 +3,7 @@ __pycache__/
 .ipynb_checkpoints
 node_modules/
 *.ilps
-*.xlsx
+# *.xlsx
 # /Data/
 /Papers/
 /Results/
