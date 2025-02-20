@@ -65,8 +65,8 @@ class EMS:
             forecast.reset_index(drop=True, inplace=True)
             forecast['ds'] = X_df['ds'].reset_index(drop=True)
 
-            forecast.to_excel(
-                f'./Data/Forecasts/{YEAR}/{auction}/{self.auction_data.current_date}_exo{exos}.xlsx', index=False)
+            # forecast.to_excel(
+            #     f'./Data/Forecasts/{YEAR}/{auction}/{self.auction_data.current_date}_exo{exos}.xlsx', index=False)
             rating = self.rate_forecast(auction, forecast['MSTL'].values)
             print(f'{rating:.2f}%')
             return forecast['MSTL'].values
@@ -156,10 +156,13 @@ class EMS:
         date_mask = self.auction_data.testing_data[auction]['ds'].dt.date == self.auction_data.current_date
         real_prices = self.auction_data.testing_data[auction].loc[date_mask, [
             'y', 'ds']].dropna()
+
         plt.plot(real_prices['ds'], real_prices['y'], label='Real Prices')
         for scenario in scenarios:
-            plt.plot(real_prices['ds'], scenario)
-        plt.legend()
+            plt.plot(real_prices['ds'], scenario,
+                     alpha=0.7, linestyle='--', marker='o')
+        plt.xlabel("Time")
+        plt.ylabel("Price")
         plt.show()
 
     def prepare_two_stage(self, first_stage, second_stage):
@@ -204,11 +207,11 @@ class StochasticEMS(EMS):
                     name=f"soc_balance_t{t}_s{s}"
                 )
                 model.addConstr(
-                    soc[t+1, s] <= soc[t, s] + self.battery.power,
+                    soc[t+1, s] <= soc[t, s] + (self.battery.power / 2),
                     name=f"physical_charge_limit_t{t}_s{s}"
                 )
                 model.addConstr(
-                    soc[t+1, s] >= soc[t, s] - self.battery.power,
+                    soc[t+1, s] >= soc[t, s] - (self.battery.power / 2),
                     name=f"physical_discharge_limit_t{t}_s{s}"
                 )
 
@@ -268,11 +271,11 @@ class StochasticEMS(EMS):
                 name=f"soc_balance_t{t}"
             )
             model.addConstr(
-                soc[t+1] <= soc[t] + self.battery.power,
+                soc[t+1] <= soc[t] + (self.battery.power / 2),
                 name=f"physical_charge_limit_t{t}"
             )
             model.addConstr(
-                soc[t+1] >= soc[t] - self.battery.power,
+                soc[t+1] >= soc[t] - (self.battery.power / 2),
                 name=f"physical_discharge_limit_t{t}"
             )
 
@@ -369,15 +372,10 @@ class StochasticEMS(EMS):
 
         self.risk_averse_factor = RISK_AVERSE_FACTOR
 
-        pd.DataFrame(res).to_excel(
-            f'cvars_{self.auction_data.current_date}.xlsx')
-
-        plt.plot(res.keys(), [v['cvar'] for v in res.values()], label='CVaR')
+        plt.plot(res.keys(), [v['cvar']
+                 for v in res.values()], label='Accepted risk')
         plt.plot(res.keys(), [v["e_total_profit"]
-                 for v in res.values()], label='Expected Profit')
-        # plt.plot(res.keys(), [v["e_min_profit"]
-        #          for v in res.values()], label='Min Profit')
-        # plt.plot(res.keys(), [v["e_max_profit"] for v in res.values()], label='Max Profit')
+                 for v in res.values()], label='Expected profit')
         plt.axhline(y=0, color='gray', alpha=0.5, zorder=1)
         plt.axvline(x=0, color='gray', alpha=0.5, zorder=1)
         plt.legend()
@@ -408,11 +406,11 @@ class DeterministicEMS(EMS):
                 name=f"soc_balance_t{t}"
             )
             model.addConstr(
-                soc[t+1] <= soc[t] + self.battery.power,
+                soc[t+1] <= soc[t] + (self.battery.power / 2),
                 name=f"physical_charge_limit_t{t}"
             )
             model.addConstr(
-                soc[t+1] >= soc[t] - self.battery.power,
+                soc[t+1] >= soc[t] - (self.battery.power / 2),
                 name=f"physical_discharge_limit_t{t}"
             )
 

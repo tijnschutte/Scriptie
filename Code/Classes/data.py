@@ -112,10 +112,10 @@ class AuctionData:
         return self.testing_data[auction].loc[date_mask, 'y'].dropna().values
 
     def get_forecast_from_file(self, auction, given_exos=None):
-        print(f"getting forecast from {file}")
         exo_vars = given_exos if given_exos is not None else self.training_data[auction].drop(
             columns=['y', 'ds', 'unique_id']).columns.tolist()
         file = f'./Data/Forecasts/{YEAR}/{auction}/{self.current_date}_exo{exo_vars}.xlsx'
+        print(f"getting forecast from {file}")
         forecast = pd.read_excel(file)
         return forecast['MSTL'].values
 

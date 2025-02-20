@@ -6,7 +6,6 @@ from Classes.ems import StochasticEMS, DeterministicEMS
 from Classes.simulate import Simulation
 from config import *
 import matplotlib.pyplot as plt
-# plt.style.use('seaborn-v0_8')
 plt.rcParams.update({
     'figure.figsize': (8, 6),        # Default figure size
     'font.size': 12,                # Font size for labels and titles

@@ -17,7 +17,7 @@ class Simulation:
             print(f"\n{self.auction_data.current_date}")
             print("===========")
 
-            if CVAR_PLOT_DAY != None and self.auction_data.current_date == pd.to_datetime(CVAR_PLOT_DAY).date():
+            if CVAR_PLOT_DAY and self.auction_data.current_date == pd.to_datetime(CVAR_PLOT_DAY).date():
                 self.ems.plot_cvars()
 
             stages, profit, cycles = self.ems.run()

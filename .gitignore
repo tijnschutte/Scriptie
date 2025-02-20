@@ -4,7 +4,7 @@ __pycache__/
 node_modules/
 *.ilps
 # *.xlsx
-# /Data/
+/Data/Paper/
 /Papers/
 /Results/
 .vscode/
